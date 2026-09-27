@@ -1,6 +1,6 @@
 # 数字扶手｜火山引擎语音与受控 AI 选型
 
-调研日期：2026-09-28。以下是官方接口可行性与团队实施建议，**尚未开通服务、接入云 API 或完成三语试听**。本次黑客松以 Android 15 / Pixel 7 模拟器为演示设备；演示证据如实标记为模拟器运行。
+调研与控制台试用日期：2026-09-28。已在火山引擎豆包语音新版控制台的**免费体验中心**生成普通话、粤语、英语三段 TTS 样本；尚未开通正式服务、接入云 API、在 Android App 中播放，或由真人完成音质审听。控制台体验成功不等于产品集成或三语无障碍验收。本次黑客松以 Android 15 / Pixel 7 模拟器为演示设备；演示证据如实标记为模拟器运行。
 
 ## 先做哪一段
 
@@ -23,10 +23,27 @@
 | 需求 | 官方能力 | 对本项目的判断 |
 |---|---|---|
 | 普通话、粤语、英语语音输入 | [流式识别 2.0 选型](https://docs.volcengine.com/docs/DoubaoVoice/Accessmust-read_1?lang=zh)区分一句话识别 `bigmodel_nostream` 与实时识别 `bigmodel_async`；[单向 WebSocket API](https://docs.volcengine.com/docs/DoubaoVoice/unidirectional-streaming-automatic-speech-recognition-websocket?lang=zh)列出 `zh-CN`、`yue-CN`、`en-US`。 | MVP 是按住/点击说一句任务，优先试稳定的 `bigmodel_nostream`；结果先让用户看见和修改，再交给任务匹配。现有 App 内粤语标签为 `yue-HK`，接火山接口需明确映射到 `yue-CN`，不能直接传过去。 |
-| 三语播报 | [TTS HTTP API](https://docs.volcengine.com/docs/DoubaoVoice/unidirectional-streaming-text-to-speech-http?lang=zh)有语种参数及 `explicit_dialect=yue`；使用粤语参数须选择支持方言的音色。 | 普通话、英语先以短句验证。粤语必须核对账号可用音色并由粤语使用者试听，再标为可用；接口列出参数不等于当前账号已有自然粤语播报。播报只读已审核文案；失败时保留可折叠文字卡。 |
+| 三语播报 | [TTS HTTP API](https://docs.volcengine.com/docs/DoubaoVoice/unidirectional-streaming-text-to-speech-http?lang=zh)有语种参数及 `explicit_dialect=yue`；使用粤语参数须选择支持方言的音色。 | 控制台已分别生成三语样本；优先试 TTS 2.0 的 Vivi 2.0（普通话/英语用“中英混/默认”，粤语用“中英混/粤语”），以 TTS 1.0 的“粤语小溏”作粤语对照。粤语真人审听及正式 API 调用仍待完成。播报只读已审核文案；失败时保留可折叠文字卡。 |
 | 自然语言理解 | [方舟 Chat API](https://docs.volcengine.com/docs/ark/chat-api?lang=zh)支持部分模型的结构化 `json_schema` 响应，官方标明该能力存在 beta 限制。 | 只输出 `task_id`、`clarify`、`unsupported`，服务器或 App 再按允许列表验证；与现有关键词规则用同一组三语样例对照。没有模型结果前不宣称已经接入 GenAI。 |
 
 不在第一轮接入端到端实时语音对话：当前产品需要独立控制输入、文字与播报语言，还需要用户确认及固定步骤。模块化管线更容易逐项验证错误和保留文字退路。这个顺序是团队的产品判断，不是官方对各模型效果的承诺。
+
+## 本账号控制台实测：TTS 能生成，音质未审听
+
+测试入口：[豆包语音新版控制台／语音合成体验中心](https://console.volcengine.com/speech/new/experience/tts?projectName=default)。测试使用与字体任务相同的简短引导意义，未输入用户录音、个人资料或页面截图。体验额度来自控制台试用，未开通正式计费服务；当前额度与服务政策以控制台实时显示为准。
+
+| 语言与文案 | 配置 | 控制台可观察结果 |
+|---|---|---|
+| 普通话：“请先打开「显示大小和文字」，再找到「字体大小」。您可以慢慢操作，需要时随时查看文字提示。” | TTS 2.0 / Vivi 2.0 / 中英混、默认 | 合成成功；44 字，播放器显示约 9 秒。 |
+| 粤语：“而家請你打開「顯示大小同文字」，再搵到「字體大小」。唔使急，可以慢慢嚟。” | TTS 2.0 / Vivi 2.0 / 中英混、粤语 | 合成成功；36 字，播放器显示约 8 秒。 |
+| 同一段粤语文案 | TTS 1.0 / 粤语小溏（音色库标记“粤语口音”） | 合成成功；36 字，播放器显示约 8 秒。 |
+| 英语：“Please open Display size and text, then find Font size. Take your time; you can always check the written instructions.” | TTS 2.0 / Vivi 2.0 / 中英混、默认 | 合成成功；118 字符，播放器显示约 9 秒。 |
+
+TTS 2.0 的音色库按“中英混 + 粤语口音”筛选时未显示音色，但 Vivi 2.0 的配置菜单确实提供“粤语”选项，且该模式完成了合成；音色库筛选结果不能据此判定 2.0 不支持粤语。TTS 1.0 同一筛选可见“粤语小溏”，其展示描述偏年轻、活泼。两版都需要粤语使用者判断发音、语速、亲和感、术语读法及是否显得幼稚；**目前只验证生成和时长，不宣称已经听出哪版更好**。控制台“历史”页保留了 Vivi 2.0 的三语样本，团队可在登录后逐条试听。
+
+语音识别体验中心显示录音识别和实时识别各 20 小时试用额度，并说明支持粤语等方言；但该页需要录制或上传音频，没有现成样本。因此本次未测试普通话、粤语、英语的转写准确率，也未授予浏览器麦克风权限。下一次用公开或自制、无个人信息的三语短音频做受控测试，再与 Android 系统识别对照。
+
+**暂定选型**：先以 TTS 2.0 / Vivi 2.0 作为单音色三语技术候选，减少演示中的音色切换；粤语若审听不达标，切换 TTS 1.0 / 粤语小溏或重新选音色。ASR 暂定 `bigmodel_nostream`，仅有官方接口支持证据，实际效果尚未测。若正式 API 接入需要开通计费或接受额外协议，先核对用量、费用及条款后再做，不把体验额度等同于正式 API 可用额度。
 
 ## 最小接入与验收
 
