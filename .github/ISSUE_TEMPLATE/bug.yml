@@ -1,0 +1,24 @@
+name: Bug
+description: 报告可复现问题，避免附上个人资料
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 请使用练习数据；不要上传真实用户页面或录音。
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 设备和 Android 版本
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期与实际结果
+    validations:
+      required: true

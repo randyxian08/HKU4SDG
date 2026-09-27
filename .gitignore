@@ -5,10 +5,13 @@
 node_modules/
 dist/
 build/
-.gradle/
 .idea/
 *.iml
 local.properties
 *.keystore
 *.jks
 *.log
+.gradle/
+**/build/
+captures/
+.kotlin/

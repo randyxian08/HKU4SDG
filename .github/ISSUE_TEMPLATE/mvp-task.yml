@@ -1,0 +1,26 @@
+name: MVP 任务
+description: 黑客松中可独立认领、可验收的开发或研究任务
+title: "[MVP] "
+labels: [mvp]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 预期结果
+      description: 说明一次可演示或可检查的结果。
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围与边界
+      description: 包括设备、系统版本、语言或模拟数据范围。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收方法
+      description: 写出具体步骤和通过条件。
+    validations:
+      required: true

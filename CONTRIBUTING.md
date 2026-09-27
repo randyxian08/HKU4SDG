@@ -6,4 +6,6 @@
 4. 合并前至少请一位同伴审阅。不要把未经验证的功能写成已实现，也不要把模拟流程写成真实机构服务。
 5. 不上传个人敏感信息、真实用户录音或截图、API 密钥和 `.env` 文件；测试使用虚构数据。
 
+本地提交前运行 `source scripts/dev-env.sh` 和 `./gradlew :guide:assembleDebug :demo-target:assembleDebug :guide:testDebugUnitTest`。跨应用圈画、触控穿透、权限、TTS 和 ASR 还需在目标真机上逐项检查，CI 编译通过不能代替真机验收。每个 PR 附上检查设备、Android 版本和相关语言。
+
 产品需求以仓库中的明确任务和[飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)为起点。有冲突时先在 Issue 或 Pull Request 中确认，再修改实现。

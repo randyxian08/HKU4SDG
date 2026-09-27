@@ -1,0 +1,9 @@
+<resources>
+    <item name="open_display" type="id" />
+    <item name="open_font_size" type="id" />
+    <item name="font_slider" type="id" />
+    <item name="done_label" type="id" />
+    <item name="private_entry" type="id" />
+    <item name="private_panel" type="id" />
+    <item name="unknown_entry" type="id" />
+</resources>

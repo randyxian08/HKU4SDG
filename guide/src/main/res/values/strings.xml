@@ -1,0 +1,3 @@
+<resources>
+    <string name="accessibility_description">读取数字扶手练习场的已登记控件位置并显示操作提示；其他应用的窗口切换仅用于撤下旧提示，不读取其页面内容。不会代替用户点击，引导服务不上传页面内容。语音输入另由设备识别服务处理。</string>
+</resources>
