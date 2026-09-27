@@ -14,6 +14,8 @@
 
 产品范围和验收建议见[飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)。该文档可能需要飞书访问权限。
 
+当前界面的用户流程、视觉原则和模拟器截图见 [Android MVP 界面](docs/interface.md)。
+
 ## 本地运行
 
 需要 Android Studio、Android SDK Platform 35、Build Tools 35、Platform Tools 和 JDK 17。macOS 开发机可执行：

@@ -6,18 +6,19 @@ import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.view.Gravity
 import android.view.View
-import android.widget.Button
+import android.view.WindowInsets
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ScrollView
-import android.widget.Spinner
-import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
 
@@ -36,74 +37,182 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::status.isInitialized) status.text = if (serviceEnabled())
-            "引导服务已开启。练习只读取“数字扶手练习场”的控件位置。"
-        else "请先开启“数字扶手 · 练习引导”无障碍服务，再开始练习。"
+            "引导服务已就绪 · 可以开始练习"
+        else "开始前，先开启引导服务"
     }
 
     private fun showHome() {
+        window.statusBarColor = Design.background
+        window.navigationBarColor = Design.background
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24, 48, 24, 40)
-            setBackgroundColor(0xFFF5F5EF.toInt())
+            setPadding(dp(24), dp(26), dp(24), dp(36))
+            setBackgroundColor(Design.background)
         }
-        fun text(value: String, size: Float) = TextView(this).apply {
-            this.text = value
-            textSize = size
-            setTextColor(0xFF182B28.toInt())
-            body.addView(this)
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        header.addView(HandrailMark(this), LinearLayout.LayoutParams(dp(46), dp(46)))
+        header.addView(text("数字扶手", 20f, Design.ink, true).apply { setPadding(dp(12), 0, 0, 0) },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(text("体验版", 12f, Design.forest, true, Gravity.CENTER).apply {
+            letterSpacing = 0.03f
+            background = Design.shape(Design.paleGreen, dp(18).toFloat())
+        }, LinearLayout.LayoutParams(dp(64), dp(32)))
+        body.addView(header)
+        space(body, 34)
+
+        body.addView(text("一段安心的手机练习", 14f, Design.orange, true).apply { letterSpacing = 0.07f })
+        space(body, 10)
+        body.addView(text("手机操作，\n慢慢来。", 36f, Design.ink, true).apply { setLineSpacing(dp(2).toFloat(), 1f) })
+        space(body, 14)
+        body.addView(text("你亲手操作，我们圈出下一步。\n想看文字，或听一遍，都可以。", 17f, Design.secondary).apply {
+            setLineSpacing(dp(5).toFloat(), 1f)
+        })
+        space(body, 26)
+
+        val serviceRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(16), dp(16), dp(16))
+            background = Design.shape(Design.surface, dp(20).toFloat(), Design.line, dp(1))
+            setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         }
-        fun button(value: String, click: () -> Unit) = Button(this).apply {
-            text = value
-            textSize = 18f
-            minHeight = 64
-            setOnClickListener { click() }
-            body.addView(this)
+        serviceRow.addView(text("●", 16f, Design.forest, true), LinearLayout.LayoutParams(dp(28), -2))
+        status = text("", 16f, Design.ink, true)
+        serviceRow.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
+        serviceRow.addView(text("设置  ›", 14f, Design.forest, true))
+        body.addView(serviceRow)
+        space(body, 16)
+
+        val feature = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+            background = Design.shape(Design.forest, dp(28).toFloat())
         }
-        text("数字扶手", 32f)
-        text("Android 跨应用引导练习 · 不会更改真实手机设置", 17f)
-        status = TextView(this).apply { textSize = 17f; body.addView(this) }
-        text("只读取练习场已登记控件的位置；检测离开练习场时撤下旧提示，不读取其他应用页面。不会替你点击。", 16f)
-        button("1 · 开启引导服务") {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        feature.addView(text("今天先试这一件事", 14f, 0xFFBCE6D3.toInt(), true).apply { letterSpacing = 0.06f })
+        space(feature, 16)
+        feature.addView(text("把字调大", 29f, Design.surface, true))
+        space(feature, 8)
+        feature.addView(text("跟着圈画走 3 步，在练习场试一试。", 16f, 0xFFE0EFE8.toInt()).apply {
+            setLineSpacing(dp(4).toFloat(), 1f)
+        })
+        space(feature, 17)
+        feature.addView(text("01   ───   02   ───   03", 13f, 0xFFBCE6D3.toInt(), true))
+        space(feature, 20)
+        feature.addView(action("开始练习     ↗", Design.surface, Design.forest) { startPractice() })
+        body.addView(feature)
+        space(body, 10)
+        body.addView(text("练习场是独立的模拟 App，不会改动真实手机设置。", 13f, Design.secondary))
+        space(body, 30)
+
+        body.addView(text("也可以告诉我你想做什么", 21f, Design.ink, true))
+        space(body, 8)
+        body.addView(text("目前只支持上面的练习任务。", 14f, Design.secondary))
+        space(body, 14)
+        val askCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(14), dp(18), dp(18))
+            background = Design.shape(Design.surface, dp(22).toFloat(), Design.line, dp(1))
         }
-        text("2 · 选择三种语言（互不联动）", 21f)
-        languageSelector(body, "输入语言", preferences.inputLanguage) { preferences.inputLanguage = it }
-        languageSelector(body, "文字语言", preferences.textLanguage) { preferences.textLanguage = it }
-        languageSelector(body, "播报语言", preferences.voiceLanguage) { preferences.voiceLanguage = it }
+        val inputRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         input = EditText(this).apply {
-            hint = "例如：手机啲字太细 / make text bigger"
-            textSize = 19f
-            minHeight = 64
-            body.addView(this)
+            hint = "例如：手机啲字太细"
+            textSize = 17f
+            setTextColor(Design.ink)
+            setHintTextColor(Design.secondary)
+            background = null
+            minHeight = dp(54)
+            isSingleLine = true
         }
-        button("点按说话") { beginListening() }
-        button("3 · 用文字开始练习") {
+        inputRow.addView(input, LinearLayout.LayoutParams(0, dp(56), 1f))
+        inputRow.addView(action("说话", Design.paleGreen, Design.forest, 54) { beginListening() },
+            LinearLayout.LayoutParams(dp(76), dp(54)))
+        askCard.addView(inputRow)
+        space(askCard, 12)
+        askCard.addView(action("按输入的内容开始", Design.paleGreen, Design.forest, 54) {
             if (TaskMatcher.matchesFontSize(input.text.toString())) startPractice()
-            else Toast.makeText(this, "目前只支持“调大字体”；也可点下面的任务卡。", Toast.LENGTH_LONG).show()
+            else Toast.makeText(this, "目前只支持“把字调大”，可点击上方练习卡片。", Toast.LENGTH_LONG).show()
+        })
+        body.addView(askCard)
+        space(body, 32)
+
+        body.addView(text("按你习惯的语言来", 21f, Design.ink, true))
+        space(body, 8)
+        body.addView(text("输入、屏幕文字、语音播报，可以分别选择。", 14f, Design.secondary))
+        space(body, 14)
+        val languageCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(4), dp(18), dp(4))
+            background = Design.shape(Design.surface, dp(22).toFloat(), Design.line, dp(1))
         }
-        button("任务卡：把字调大") { startPractice() }
-        text("语音识别由设备服务处理，可能联网；使用前会单独提示。不可用时请用文字或任务卡。粤语效果需要真人实测。", 15f)
-        setContentView(ScrollView(this).apply { addView(body) })
+        languageRow(languageCard, "入", "你说 / 输入", { preferences.inputLanguage }) { preferences.inputLanguage = it }
+        divider(languageCard)
+        languageRow(languageCard, "文", "屏幕文字", { preferences.textLanguage }) { preferences.textLanguage = it }
+        divider(languageCard)
+        languageRow(languageCard, "声", "语音播报", { preferences.voiceLanguage }) { preferences.voiceLanguage = it }
+        body.addView(languageCard)
+        space(body, 26)
+        body.addView(text("你决定每一步。遇到陌生或私人页面，引导会停下来；语音输入会在使用前单独说明。", 14f, Design.secondary).apply {
+            setLineSpacing(dp(4).toFloat(), 1f)
+        })
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(Design.background)
+            addView(body)
+        }
+        scroll.setOnApplyWindowInsetsListener { _, insets ->
+            val topInset = if (Build.VERSION.SDK_INT >= 30)
+                insets.getInsets(WindowInsets.Type.statusBars()).top else insets.systemWindowInsetTop
+            val bottomInset = if (Build.VERSION.SDK_INT >= 30)
+                insets.getInsets(WindowInsets.Type.navigationBars()).bottom else insets.systemWindowInsetBottom
+            body.setPadding(dp(24), dp(26) + topInset, dp(24), dp(36))
+            scroll.setPadding(0, 0, 0, bottomInset)
+            insets
+        }
+        setContentView(scroll)
         onResume()
     }
 
-    private fun languageSelector(
-        body: LinearLayout, label: String, selected: GuideLanguage,
-        onSelect: (GuideLanguage) -> Unit
+    private fun action(label: String, fill: Int, color: Int, height: Int = 58, click: () -> Unit) =
+        text(label, 17f, color, true, Gravity.CENTER).apply {
+            minHeight = dp(height)
+            background = Design.shape(fill, dp(16).toFloat())
+            setOnClickListener { click() }
+        }
+
+    private fun space(parent: LinearLayout, height: Int) {
+        parent.addView(View(this), LinearLayout.LayoutParams(1, dp(height)))
+    }
+
+    private fun divider(parent: LinearLayout) {
+        parent.addView(View(this).apply { setBackgroundColor(Design.line) }, LinearLayout.LayoutParams(-1, dp(1)))
+    }
+
+    private fun languageRow(
+        parent: LinearLayout, symbol: String, label: String,
+        current: () -> GuideLanguage, onSelect: (GuideLanguage) -> Unit
     ) {
-        body.addView(TextView(this).apply { text = label; textSize = 17f })
-        body.addView(Spinner(this).apply {
-            val languages = GuideLanguage.entries
-            adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item,
-                languages.map { it.label })
-            setSelection(languages.indexOf(selected))
-            onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    onSelect(languages[position])
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(67) }
+        row.addView(text(symbol, 15f, Design.forest, true, Gravity.CENTER).apply {
+            background = Design.shape(Design.paleGreen, dp(13).toFloat())
+        }, LinearLayout.LayoutParams(dp(36), dp(36)))
+        row.addView(text(label, 16f, Design.ink, true).apply { setPadding(dp(12), 0, 0, 0) },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        val value = text("${current().label}  ⌄", 15f, Design.forest, true)
+        row.addView(value)
+        row.setOnClickListener {
+            PopupMenu(this, value).apply {
+                GuideLanguage.entries.forEachIndexed { index, language -> menu.add(0, index, index, language.label) }
+                setOnMenuItemClickListener { item ->
+                    val selected = GuideLanguage.entries[item.itemId]
+                    onSelect(selected)
+                    value.text = "${selected.label}  ⌄"
+                    true
                 }
-                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+                show()
             }
-        })
+        }
+        parent.addView(row)
     }
 
     private fun serviceEnabled(): Boolean {

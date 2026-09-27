@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
-import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -14,7 +13,6 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -122,8 +120,11 @@ class GuideAccessibilityService : AccessibilityService() {
         shownStep = step
         renderKey = key
         overlay.showStep(
+            step = step,
             bounds = bounds,
             message = GuideContent.instruction(step, preferences.textLanguage),
+            textLanguage = preferences.textLanguage,
+            voiceLanguage = preferences.voiceLanguage,
             collapsed = preferences.collapsed,
             muted = preferences.muted,
             onCollapse = { preferences.collapsed = !preferences.collapsed; render(true) },
@@ -196,84 +197,141 @@ private class GuideOverlay(private val service: AccessibilityService) {
     }
 
     fun showStep(
-        bounds: Rect?, message: String, collapsed: Boolean, muted: Boolean,
+        step: GuideStep, bounds: Rect?, message: String,
+        textLanguage: GuideLanguage, voiceLanguage: GuideLanguage,
+        collapsed: Boolean, muted: Boolean,
         onCollapse: () -> Unit, onTextLanguage: () -> Unit, onVoiceLanguage: () -> Unit,
         onReplay: () -> Unit, onMute: () -> Unit, onExit: () -> Unit
     ) {
         clear()
-        if (bounds != null) addRing(bounds)
+        if (bounds != null) addRing(bounds, step)
         val root = cardBase()
-        root.addView(label(if (collapsed) "本步提示 · 查看文字" else message, if (collapsed) 18f else 22f))
-        val controls = LinearLayout(service).apply { orientation = LinearLayout.HORIZONTAL }
-        controls.addView(control(if (collapsed) "展开" else "收起", onCollapse))
-        controls.addView(control(if (muted) "开声音" else "静音", onMute))
-        controls.addView(control("重播", onReplay))
-        controls.addView(control("结束", onExit))
-        root.addView(controls)
-        if (!collapsed) {
-            val languages = LinearLayout(service).apply { orientation = LinearLayout.HORIZONTAL }
-            languages.addView(control("换文字语言", onTextLanguage))
-            languages.addView(control("换播报语言", onVoiceLanguage))
+        if (step == GuideStep.COMPLETE) {
+            root.addView(label("●  练习完成", 14f, Design.forest, true))
+            space(root, 14)
+            root.addView(label(message, 21f, Design.ink, true).apply { setLineSpacing(dp(4).toFloat(), 1f) })
+            space(root, 19)
+            root.addView(tap("结束练习", Design.forest, Design.surface, 16f, onExit),
+                LinearLayout.LayoutParams(-1, dp(52)))
+            addCard(root, null)
+            return
+        }
+        val number = "第 ${step.ordinal + 1} / 3 步"
+        val eyebrow = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
+        eyebrow.addView(label("●  正在引导  ·  $number", 13f, Design.forest, true),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        eyebrow.addView(tap(if (collapsed) "展开文字  ⌄" else "收起文字  ⌃", Design.paleGreen,
+            Design.forest, 13f, onCollapse))
+        root.addView(eyebrow)
+        if (collapsed) {
+            space(root, 9)
+            root.addView(label("圈出的地方，就是下一步", 17f, Design.ink, true))
+        } else {
+            space(root, 15)
+            root.addView(label(message, 22f, Design.ink, true).apply {
+                setLineSpacing(dp(4).toFloat(), 1f)
+            })
+            space(root, 17)
+            val languages = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
+            languages.addView(tap("文字  ${textLanguage.label}  ⌄", Design.paleGreen,
+                Design.forest, 14f, onTextLanguage), LinearLayout.LayoutParams(0, dp(44), 1f))
+            languages.addView(View(service), LinearLayout.LayoutParams(dp(8), 1))
+            languages.addView(tap("播报  ${voiceLanguage.label}  ⌄", Design.paleGreen,
+                Design.forest, 14f, onVoiceLanguage), LinearLayout.LayoutParams(0, dp(44), 1f))
             root.addView(languages)
         }
-        addCard(root, bounds == null || bounds.centerY() < service.resources.displayMetrics.heightPixels / 2)
+        space(root, 15)
+        val actions = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
+        actions.addView(tap("再听一遍", Design.forest, Design.surface, 15f, onReplay),
+            LinearLayout.LayoutParams(0, dp(48), 1.3f))
+        actions.addView(View(service), LinearLayout.LayoutParams(dp(8), 1))
+        actions.addView(tap(if (muted) "开声音" else "静音", Design.background, Design.ink, 14f, onMute),
+            LinearLayout.LayoutParams(0, dp(48), 1f))
+        actions.addView(View(service), LinearLayout.LayoutParams(dp(8), 1))
+        actions.addView(tap("结束", Design.background, Design.secondary, 14f, onExit),
+            LinearLayout.LayoutParams(0, dp(48), 0.7f))
+        root.addView(actions)
+        addCard(root, bounds)
     }
 
     fun showStatus(message: String, paused: Boolean, onResume: () -> Unit, onExit: () -> Unit) {
         clear()
         val root = cardBase()
-        root.addView(label(message, 21f))
-        if (paused) root.addView(control("继续（返回普通页面后）", onResume).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52))
-        })
-        root.addView(control("结束引导", onExit).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52))
-        })
-        addCard(root, true)
+        root.addView(label(if (paused) "●  私人页面 · 已暂停" else "●  页面暂未识别", 13f,
+            if (paused) Design.orange else Design.secondary, true))
+        space(root, 13)
+        root.addView(label(message, 20f, Design.ink, true).apply { setLineSpacing(dp(4).toFloat(), 1f) })
+        space(root, 18)
+        if (paused) {
+            root.addView(tap("返回普通页面后继续", Design.forest, Design.surface, 16f, onResume),
+                LinearLayout.LayoutParams(-1, dp(52)))
+            space(root, 8)
+        }
+        root.addView(tap("结束引导", Design.background, Design.ink, 15f, onExit),
+            LinearLayout.LayoutParams(-1, dp(48)))
+        addCard(root, null)
     }
 
     private fun cardBase() = LinearLayout(service).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(10), dp(14), dp(10))
-        background = GradientDrawable().apply {
-            setColor(0xFFFCFFF4.toInt())
-            setStroke(dp(2), 0xFF136A59.toInt())
-            cornerRadius = dp(18).toFloat()
-        }
-        elevation = dp(8).toFloat()
+        setPadding(dp(20), dp(18), dp(20), dp(20))
+        background = Design.shape(Design.surface, dp(26).toFloat(), Design.line, dp(1))
+        elevation = dp(15).toFloat()
     }
 
-    private fun label(value: String, size: Float) = TextView(service).apply {
+    private fun label(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(service).apply {
         text = value
         textSize = size
-        setTextColor(0xFF182B28.toInt())
-        setPadding(dp(3), dp(3), dp(3), dp(5))
+        setTextColor(color)
+        includeFontPadding = false
+        if (bold) typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
     }
 
-    private fun control(value: String, click: () -> Unit) = Button(service).apply {
+    private fun tap(value: String, fill: Int, color: Int, size: Float, click: () -> Unit) = TextView(service).apply {
         text = value
-        textSize = 13f
-        isAllCaps = false
-        minHeight = dp(48)
-        minWidth = 0
-        setPadding(dp(4), 0, dp(4), 0)
-        layoutParams = LinearLayout.LayoutParams(0, dp(52), 1f)
+        textSize = size
+        setTextColor(color)
+        gravity = Gravity.CENTER
+        includeFontPadding = false
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        setPadding(dp(8), dp(8), dp(8), dp(8))
+        minHeight = dp(44)
+        background = Design.shape(fill, dp(13).toFloat())
         setOnClickListener { click() }
     }
 
-    private fun addRing(bounds: Rect) {
-        val padding = dp(7)
+    private fun space(parent: LinearLayout, height: Int) {
+        parent.addView(View(service), LinearLayout.LayoutParams(1, dp(height)))
+    }
+
+    private fun addRing(bounds: Rect, step: GuideStep) {
+        val padding = dp(15)
         val view = object : View(service) {
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFFE87C24.toInt()
+            val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Design.orange
                 style = Paint.Style.STROKE
-                strokeWidth = dp(4).toFloat()
+                strokeWidth = dp(3).toFloat()
+            }
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AE8783D }
+            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.orange }
+            val badgeText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Design.surface
+                textSize = dp(13).toFloat()
+                textAlign = Paint.Align.CENTER
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
             }
             override fun onDraw(canvas: Canvas) {
                 super.onDraw(canvas)
-                canvas.drawRoundRect(dp(3).toFloat(), dp(3).toFloat(),
-                    (width - dp(3)).toFloat(), (height - dp(3)).toFloat(),
-                    dp(12).toFloat(), dp(12).toFloat(), paint)
+                val left = padding.toFloat()
+                val top = padding.toFloat()
+                val right = (width - padding).toFloat()
+                val bottom = (height - padding).toFloat()
+                canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), fill)
+                canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), stroke)
+                if (step != GuideStep.COMPLETE) {
+                    canvas.drawCircle(left, top, dp(14).toFloat(), badge)
+                    canvas.drawText((step.ordinal + 1).toString(), left, top - (badgeText.ascent() + badgeText.descent()) / 2, badgeText)
+                }
             }
         }
         val params = WindowManager.LayoutParams(bounds.width() + padding * 2, bounds.height() + padding * 2,
@@ -289,15 +347,21 @@ private class GuideOverlay(private val service: AccessibilityService) {
         ring = view
     }
 
-    private fun addCard(view: View, atBottom: Boolean) {
-        val width = service.resources.displayMetrics.widthPixels - dp(24)
+    private fun addCard(view: View, bounds: Rect?) {
+        val width = service.resources.displayMetrics.widthPixels - dp(32)
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        val screenHeight = service.resources.displayMetrics.heightPixels
+        val atBottom = bounds == null || bounds.bottom + dp(16) < screenHeight - view.measuredHeight - dp(48)
         val params = WindowManager.LayoutParams(width, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply {
             gravity = (if (atBottom) Gravity.BOTTOM else Gravity.TOP) or Gravity.START
-            x = dp(12)
-            y = dp(28)
+            x = dp(16)
+            y = dp(if (atBottom) 24 else 64)
         }
         wm.addView(view, params)
         card = view
