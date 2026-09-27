@@ -22,6 +22,7 @@ class GuideAccessibilityService : AccessibilityService() {
     private lateinit var preferences: GuidePreferences
     private lateinit var overlay: GuideOverlay
     private var tts: TextToSpeech? = null
+    private var cloudTts: CloudTts? = null
     private var ttsReady = false
     private var shownStep: GuideStep? = null
     private var renderKey: String? = null
@@ -31,6 +32,7 @@ class GuideAccessibilityService : AccessibilityService() {
         preferences = GuidePreferences(this)
         overlay = GuideOverlay(this)
         tts = TextToSpeech(this) { ttsReady = it == TextToSpeech.SUCCESS }
+        cloudTts = CloudTts(this)
         handler.postDelayed({ if (preferences.active) render(true) }, 300)
     }
 
@@ -38,6 +40,7 @@ class GuideAccessibilityService : AccessibilityService() {
         if (!::overlay.isInitialized || !preferences.active) {
             if (::overlay.isInitialized) overlay.clear()
             tts?.stop()
+            cloudTts?.stop()
             return
         }
         if (event?.packageName?.toString() != SETTINGS_PACKAGE) {
@@ -45,6 +48,7 @@ class GuideAccessibilityService : AccessibilityService() {
             if (rootInActiveWindow?.packageName?.toString() != SETTINGS_PACKAGE) {
                 overlay.clear()
                 tts?.stop()
+                cloudTts?.stop()
                 renderKey = null
             }
             return
@@ -55,6 +59,7 @@ class GuideAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         tts?.stop()
+        cloudTts?.stop()
         if (::overlay.isInitialized) overlay.clear()
     }
 
@@ -62,6 +67,7 @@ class GuideAccessibilityService : AccessibilityService() {
         handler.removeCallbacksAndMessages(null)
         tts?.stop()
         tts?.shutdown()
+        cloudTts?.close()
         if (::overlay.isInitialized) overlay.clear()
         super.onDestroy()
     }
@@ -90,6 +96,7 @@ class GuideAccessibilityService : AccessibilityService() {
         if (root?.packageName?.toString() != SETTINGS_PACKAGE) {
             overlay.clear()
             tts?.stop()
+            cloudTts?.stop()
             return
         }
         // Strictly match this tested English Android 15 Settings layout. Unknown layouts stop.
@@ -110,6 +117,7 @@ class GuideAccessibilityService : AccessibilityService() {
         }
         if (target == null || (target.first != GuideStep.COMPLETE && target.second == null)) {
             tts?.stop()
+            cloudTts?.stop()
             shownStep = null
             renderKey = null
             overlay.showStatus(GuideContent.unknown(preferences.textLanguage), false,
@@ -135,7 +143,7 @@ class GuideAccessibilityService : AccessibilityService() {
             onTextLanguage = { preferences.textLanguage = next(preferences.textLanguage); render(true) },
             onVoiceLanguage = { preferences.voiceLanguage = next(preferences.voiceLanguage); render(true) },
             onReplay = { speak(step) },
-            onMute = { preferences.muted = !preferences.muted; if (preferences.muted) tts?.stop(); render(true) },
+            onMute = { preferences.muted = !preferences.muted; if (preferences.muted) { tts?.stop(); cloudTts?.stop() }; render(true) },
             onExit = ::endGuide
         )
         if (changedStep && step != GuideStep.COMPLETE) speak(step)
@@ -145,15 +153,24 @@ class GuideAccessibilityService : AccessibilityService() {
         GuideLanguage.entries[(current.ordinal + 1) % GuideLanguage.entries.size]
 
     private fun speak(step: GuideStep) {
+        if (preferences.muted) return
+        tts?.stop()
+        val message = GuideContent.instruction(step, preferences.voiceLanguage)
+        val language = preferences.voiceLanguage
+        cloudTts?.speak(message, language) { speakOnDevice(message, language) }
+            ?: speakOnDevice(message, language)
+    }
+
+    private fun speakOnDevice(message: String, language: GuideLanguage) {
         if (preferences.muted || !ttsReady) return
         val engine = tts ?: return
-        val locale = preferences.voiceLanguage.locale
+        val locale = language.locale
         val support = engine.isLanguageAvailable(locale)
         if (support < TextToSpeech.LANG_AVAILABLE || engine.setLanguage(locale) < TextToSpeech.LANG_AVAILABLE) {
-            Toast.makeText(this, "本机暂不支持 ${preferences.voiceLanguage.label} 播报，请查看文字提示。", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "本机暂不支持 ${language.label} 播报，请查看文字提示。", Toast.LENGTH_LONG).show()
             return
         }
-        engine.speak(GuideContent.instruction(step, preferences.voiceLanguage), TextToSpeech.QUEUE_FLUSH, null, "guide-$step")
+        engine.speak(message, TextToSpeech.QUEUE_FLUSH, null, "guide-${language.name}")
     }
 
     private fun endGuide() {
@@ -161,6 +178,7 @@ class GuideAccessibilityService : AccessibilityService() {
         shownStep = null
         renderKey = null
         tts?.stop()
+        cloudTts?.stop()
         overlay.clear()
     }
 

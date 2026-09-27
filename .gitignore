@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 node_modules/
+__pycache__/
 dist/
 build/
 .idea/

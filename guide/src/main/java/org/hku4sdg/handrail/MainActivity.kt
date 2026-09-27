@@ -402,7 +402,7 @@ class MainActivity : Activity() {
         languageRow(card, "声", "语音播报", { preferences.voiceLanguage }) { preferences.voiceLanguage = it }
         body.addView(card)
         space(body, 20)
-        body.addView(text("语音识别和播报由设备提供；某种语言不可用时，文字和任务卡仍可使用。", 15f, Design.secondary))
+        body.addView(text("语音识别由设备提供。播报可能将固定引导文字交给云端语音服务；连接失败时使用设备播报。文字和任务卡始终可用。", 15f, Design.secondary))
     }
 
     private fun page(title: String): LinearLayout {
