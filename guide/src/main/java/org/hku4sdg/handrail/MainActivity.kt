@@ -23,6 +23,8 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
+    private enum class Screen { HOME, TASK, LANGUAGES }
+    private var screen = Screen.HOME
     private lateinit var preferences: GuidePreferences
     private lateinit var input: EditText
     private lateinit var status: TextView
@@ -37,11 +39,12 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::status.isInitialized) status.text = if (serviceEnabled())
-            "引导服务已就绪 · 可以开始练习"
-        else "开始前，先开启引导服务"
+            "引导服务已开启"
+        else "开启引导服务"
     }
 
     private fun showHome() {
+        screen = Screen.HOME
         window.statusBarColor = Design.background
         window.navigationBarColor = Design.background
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
@@ -54,21 +57,52 @@ class MainActivity : Activity() {
         header.addView(HandrailMark(this), LinearLayout.LayoutParams(dp(46), dp(46)))
         header.addView(text("数字扶手", 20f, Design.ink, true).apply { setPadding(dp(12), 0, 0, 0) },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(text("体验版", 12f, Design.forest, true, Gravity.CENTER).apply {
+        header.addView(text("语言", 14f, Design.forest, true, Gravity.CENTER).apply {
             letterSpacing = 0.03f
             background = Design.shape(Design.paleGreen, dp(18).toFloat())
-        }, LinearLayout.LayoutParams(dp(64), dp(32)))
+            setOnClickListener { showLanguages() }
+        }, LinearLayout.LayoutParams(dp(64), dp(48)))
         body.addView(header)
         space(body, 34)
 
-        body.addView(text("一段安心的手机练习", 14f, Design.orange, true).apply { letterSpacing = 0.07f })
-        space(body, 10)
-        body.addView(text("手机操作，\n慢慢来。", 36f, Design.ink, true).apply { setLineSpacing(dp(2).toFloat(), 1f) })
-        space(body, 14)
-        body.addView(text("你亲手操作，我们圈出下一步。\n想看文字，或听一遍，都可以。", 17f, Design.secondary).apply {
-            setLineSpacing(dp(5).toFloat(), 1f)
+        body.addView(text("今天想在手机上\n做什么？", 32f, Design.ink, true).apply {
+            setLineSpacing(dp(2).toFloat(), 1f)
         })
-        space(body, 26)
+        space(body, 8)
+        body.addView(text("说出来，或选择下面的任务。你自己动手，我们陪你走下一步。", 16f, Design.secondary).apply {
+            setLineSpacing(dp(4).toFloat(), 1f)
+        })
+        space(body, 22)
+
+        val askCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(8), dp(18), dp(18))
+            background = Design.shape(Design.surface, dp(24).toFloat(), Design.line, dp(1))
+        }
+        val inputRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        input = EditText(this).apply {
+            hint = "例如：我想把字调大"
+            textSize = 17f
+            setTextColor(Design.ink)
+            setHintTextColor(Design.secondary)
+            background = null
+            minHeight = dp(56)
+            isSingleLine = true
+            contentDescription = "输入你想完成的手机任务"
+        }
+        inputRow.addView(input, LinearLayout.LayoutParams(0, dp(56), 1f))
+        inputRow.addView(action("说话", Design.paleGreen, Design.forest, 54) { beginListening() },
+            LinearLayout.LayoutParams(dp(74), dp(54)))
+        askCard.addView(inputRow)
+        space(askCard, 6)
+        askCard.addView(action("查看可用引导  →", Design.forest, Design.surface) {
+            if (TaskMatcher.matchesFontSize(input.text.toString())) showTask()
+            else Toast.makeText(this, "目前可引导“把字调大”。也可以直接点下面的任务卡。", Toast.LENGTH_LONG).show()
+        })
+        body.addView(askCard)
+        space(body, 27)
+        body.addView(text("现在可以做", 20f, Design.ink, true))
+        space(body, 13)
 
         val serviceRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -81,79 +115,28 @@ class MainActivity : Activity() {
         status = text("", 16f, Design.ink, true)
         serviceRow.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
         serviceRow.addView(text("设置  ›", 14f, Design.forest, true))
-        body.addView(serviceRow)
-        space(body, 16)
+        // Service status stays visible, but setup no longer dominates the home screen.
 
         val feature = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(24), dp(24), dp(24))
             background = Design.shape(Design.forest, dp(28).toFloat())
         }
-        feature.addView(text("今天先试这一件事", 14f, 0xFFBCE6D3.toInt(), true).apply { letterSpacing = 0.06f })
-        space(feature, 16)
-        feature.addView(text("把字调大", 29f, Design.surface, true))
+        feature.addView(text("手机设置  ·  约 1 分钟", 13f, 0xFFBCE6D3.toInt(), true))
+        space(feature, 12)
+        feature.addView(text("把字调大", 28f, Design.surface, true))
         space(feature, 8)
-        feature.addView(text("跟着圈画走 3 步，在练习场试一试。", 16f, 0xFFE0EFE8.toInt()).apply {
+        feature.addView(text("在手机的真实设置里完成。每一步都有圈画、文字和语音。", 16f, 0xFFE0EFE8.toInt()).apply {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
-        space(feature, 17)
-        feature.addView(text("01   ───   02   ───   03", 13f, 0xFFBCE6D3.toInt(), true))
         space(feature, 20)
-        feature.addView(action("开始练习     ↗", Design.surface, Design.forest) { startPractice() })
+        feature.addView(action("查看任务  →", Design.surface, Design.forest) { showTask() })
         body.addView(feature)
-        space(body, 10)
-        body.addView(text("练习场是独立的模拟 App，不会改动真实手机设置。", 13f, Design.secondary))
-        space(body, 30)
-
-        body.addView(text("也可以告诉我你想做什么", 21f, Design.ink, true))
-        space(body, 8)
-        body.addView(text("目前只支持上面的练习任务。", 14f, Design.secondary))
-        space(body, 14)
-        val askCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(14), dp(18), dp(18))
-            background = Design.shape(Design.surface, dp(22).toFloat(), Design.line, dp(1))
-        }
-        val inputRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        input = EditText(this).apply {
-            hint = "例如：手机啲字太细"
-            textSize = 17f
-            setTextColor(Design.ink)
-            setHintTextColor(Design.secondary)
-            background = null
-            minHeight = dp(54)
-            isSingleLine = true
-        }
-        inputRow.addView(input, LinearLayout.LayoutParams(0, dp(56), 1f))
-        inputRow.addView(action("说话", Design.paleGreen, Design.forest, 54) { beginListening() },
-            LinearLayout.LayoutParams(dp(76), dp(54)))
-        askCard.addView(inputRow)
-        space(askCard, 12)
-        askCard.addView(action("按输入的内容开始", Design.paleGreen, Design.forest, 54) {
-            if (TaskMatcher.matchesFontSize(input.text.toString())) startPractice()
-            else Toast.makeText(this, "目前只支持“把字调大”，可点击上方练习卡片。", Toast.LENGTH_LONG).show()
-        })
-        body.addView(askCard)
-        space(body, 32)
-
-        body.addView(text("按你习惯的语言来", 21f, Design.ink, true))
-        space(body, 8)
-        body.addView(text("输入、屏幕文字、语音播报，可以分别选择。", 14f, Design.secondary))
-        space(body, 14)
-        val languageCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(4), dp(18), dp(4))
-            background = Design.shape(Design.surface, dp(22).toFloat(), Design.line, dp(1))
-        }
-        languageRow(languageCard, "入", "你说 / 输入", { preferences.inputLanguage }) { preferences.inputLanguage = it }
-        divider(languageCard)
-        languageRow(languageCard, "文", "屏幕文字", { preferences.textLanguage }) { preferences.textLanguage = it }
-        divider(languageCard)
-        languageRow(languageCard, "声", "语音播报", { preferences.voiceLanguage }) { preferences.voiceLanguage = it }
-        body.addView(languageCard)
-        space(body, 26)
-        body.addView(text("你决定每一步。遇到陌生或私人页面，引导会停下来；语音输入会在使用前单独说明。", 14f, Design.secondary).apply {
-            setLineSpacing(dp(4).toFloat(), 1f)
+        space(body, 16)
+        body.addView(serviceRow)
+        space(body, 12)
+        body.addView(text("当前仅验证 Android 15 / Pixel 7 模拟器的英文系统设置；其他设备会在无法确认页面时停下。", 13f, Design.secondary).apply {
+            setLineSpacing(dp(3).toFloat(), 1f)
         })
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -170,7 +153,7 @@ class MainActivity : Activity() {
             insets
         }
         setContentView(scroll)
-        onResume()
+        status.text = if (serviceEnabled()) "引导服务已开启" else "开启引导服务"
     }
 
     private fun action(label: String, fill: Int, color: Int, height: Int = 58, click: () -> Unit) =
@@ -222,20 +205,113 @@ class MainActivity : Activity() {
         return enabled.split(':').any { ComponentName.unflattenFromString(it) == id }
     }
 
-    private fun startPractice() {
+    private fun showTask() {
+        screen = Screen.TASK
+        val body = page("任务说明")
+        body.addView(text("把字调大", 32f, Design.ink, true))
+        space(body, 12)
+        body.addView(text("让手机上的文字更容易阅读。数字扶手会打开系统设置，圈出下一步；真正的点击和拖动由你完成。", 18f, Design.secondary).apply {
+            setLineSpacing(dp(5).toFloat(), 1f)
+        })
+        space(body, 28)
+        val steps = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(21), dp(20), dp(21), dp(20))
+            background = Design.shape(Design.surface, dp(24).toFloat(), Design.line, dp(1))
+        }
+        steps.addView(text("接下来会做", 15f, Design.forest, true))
+        space(steps, 18)
+        steps.addView(text("01   找到 Display size and text", 18f, Design.ink, true))
+        space(steps, 14)
+        steps.addView(text("02   调整 Font size 滑块", 18f, Design.ink, true))
+        body.addView(steps)
+        space(body, 20)
+        body.addView(text("适用范围：已在 Android 15 / Pixel 7 模拟器的英文系统设置验证。不同手机页面可能不同；认不出时会停下，不会乱指。", 15f, Design.secondary).apply {
+            setLineSpacing(dp(4).toFloat(), 1f)
+        })
+        space(body, 26)
+        body.addView(action("打开系统设置并开始  →", Design.forest, Design.surface, 62) { startSettingsGuide() })
+        space(body, 12)
+        body.addView(text("你随时可以在引导卡片上结束。", 14f, Design.secondary, gravity = Gravity.CENTER))
+    }
+
+    private fun showLanguages() {
+        screen = Screen.LANGUAGES
+        val body = page("语言设置")
+        body.addView(text("按你的习惯来", 31f, Design.ink, true))
+        space(body, 10)
+        body.addView(text("输入、屏幕文字、语音播报可以分别选择。换语言不会改变引导的操作步骤。", 17f, Design.secondary))
+        space(body, 24)
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(4), dp(18), dp(4))
+            background = Design.shape(Design.surface, dp(22).toFloat(), Design.line, dp(1))
+        }
+        languageRow(card, "入", "你说 / 输入", { preferences.inputLanguage }) { preferences.inputLanguage = it }
+        divider(card)
+        languageRow(card, "文", "屏幕文字", { preferences.textLanguage }) { preferences.textLanguage = it }
+        divider(card)
+        languageRow(card, "声", "语音播报", { preferences.voiceLanguage }) { preferences.voiceLanguage = it }
+        body.addView(card)
+        space(body, 20)
+        body.addView(text("语音识别和播报由设备提供；某种语言不可用时，文字和任务卡仍可使用。", 15f, Design.secondary))
+    }
+
+    private fun page(title: String): LinearLayout {
+        window.statusBarColor = Design.background
+        window.navigationBarColor = Design.background
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(26), dp(24), dp(36))
+            setBackgroundColor(Design.background)
+        }
+        body.addView(text("←   $title", 17f, Design.forest, true).apply {
+            minHeight = dp(52)
+            gravity = Gravity.CENTER_VERTICAL
+            setOnClickListener { showHome() }
+        })
+        space(body, 30)
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(Design.background)
+            addView(body)
+        }
+        scroll.setOnApplyWindowInsetsListener { _, insets ->
+            val top = if (Build.VERSION.SDK_INT >= 30) insets.getInsets(WindowInsets.Type.statusBars()).top else insets.systemWindowInsetTop
+            val bottom = if (Build.VERSION.SDK_INT >= 30) insets.getInsets(WindowInsets.Type.navigationBars()).bottom else insets.systemWindowInsetBottom
+            body.setPadding(dp(24), dp(26) + top, dp(24), dp(36))
+            scroll.setPadding(0, 0, 0, bottom)
+            insets
+        }
+        setContentView(scroll)
+        return body
+    }
+
+    private fun startSettingsGuide() {
         if (!serviceEnabled()) {
-            Toast.makeText(this, "请先开启引导服务", Toast.LENGTH_LONG).show()
+            AlertDialog.Builder(this)
+                .setTitle("先开启引导服务")
+                .setMessage("数字扶手需要无障碍服务才能在系统设置上圈出下一步。开启后回到这里继续；操作始终由你完成。")
+                .setNegativeButton("稍后", null)
+                .setPositiveButton("去设置") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                .show()
             return
         }
-        val intent = Intent().setClassName("org.hku4sdg.demotarget", "org.hku4sdg.demotarget.PracticeActivity")
         try {
+            preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", 1f)
             preferences.active = true
             preferences.collapsed = false
-            startActivity(intent)
+            startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
         } catch (_: Exception) {
             preferences.active = false
-            Toast.makeText(this, "请先安装同仓库的 demo-target 应用", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "无法打开系统显示设置，请稍后重试。", Toast.LENGTH_LONG).show()
         }
+    }
+
+    @Deprecated("Activity back callback used for this small native-view prototype")
+    override fun onBackPressed() {
+        if (screen == Screen.HOME) super.onBackPressed() else showHome()
     }
 
     private fun beginListening() {

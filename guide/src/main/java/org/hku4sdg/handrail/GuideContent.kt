@@ -15,28 +15,25 @@ enum class GuideLanguage(val label: String, val tag: String) {
     }
 }
 
-enum class GuideStep { DISPLAY, FONT_SIZE, SLIDER, COMPLETE }
+enum class GuideStep { DISPLAY_SIZE, SLIDER, COMPLETE }
 
-/** Fixed draft copy for this fictional task; native-speaker review is still pending. */
+/** Fixed copy for the reviewed Android 15 / Pixel 7 emulator flow. Native-speaker review is pending. */
 object GuideContent {
     fun instruction(step: GuideStep, language: GuideLanguage): String = when (language) {
         GuideLanguage.MANDARIN -> when (step) {
-            GuideStep.DISPLAY -> "第 1 步：请点圈住的“显示设置”。"
-            GuideStep.FONT_SIZE -> "第 2 步：请点圈住的“字体大小”。"
-            GuideStep.SLIDER -> "第 3 步：请亲手拖动圈住的滑块，把字调大。"
-            GuideStep.COMPLETE -> "练习完成：你已经把字调大了。"
+            GuideStep.DISPLAY_SIZE -> "请点圈住的“Display size and text”。"
+            GuideStep.SLIDER -> "请亲手把圈住的“Font size”滑块向右拖动。"
+            GuideStep.COMPLETE -> "已检测到系统字体变大。请看看现在的文字是否更容易阅读。"
         }
         GuideLanguage.CANTONESE -> when (step) {
-            GuideStep.DISPLAY -> "第 1 步：请㩒圈住嘅「显示设置」。"
-            GuideStep.FONT_SIZE -> "第 2 步：请㩒圈住嘅「字体大小」。"
-            GuideStep.SLIDER -> "第 3 步：请自己拖动圈住嘅滑桿，调大啲字。"
-            GuideStep.COMPLETE -> "练习完成：你已经将啲字调大咗。"
+            GuideStep.DISPLAY_SIZE -> "请㩒圈住嘅「Display size and text」。"
+            GuideStep.SLIDER -> "请自己将圈住嘅「Font size」滑桿向右拖。"
+            GuideStep.COMPLETE -> "系统字体已经变大。睇下而家啲字系咪易睇咗。"
         }
         GuideLanguage.ENGLISH -> when (step) {
-            GuideStep.DISPLAY -> "Step 1: Tap the circled “显示设置” button."
-            GuideStep.FONT_SIZE -> "Step 2: Tap the circled “字体大小” button."
-            GuideStep.SLIDER -> "Step 3: Move the circled slider yourself to make the text larger."
-            GuideStep.COMPLETE -> "Practice complete: you made the text larger."
+            GuideStep.DISPLAY_SIZE -> "Tap the circled “Display size and text” row."
+            GuideStep.SLIDER -> "Drag the circled “Font size” slider to the right."
+            GuideStep.COMPLETE -> "The system font is larger. Check whether the text is easier to read."
         }
     }
 
@@ -47,9 +44,9 @@ object GuideContent {
     }
 
     fun unknown(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "无法确认当前页面，已停止圈画。请返回练习流程。"
-        GuideLanguage.CANTONESE -> "确认唔到呢个页面，已经停止圈画。请返去练习流程。"
-        GuideLanguage.ENGLISH -> "This page is not recognized. Highlighting has stopped. Return to the practice flow."
+        GuideLanguage.MANDARIN -> "无法确认当前设置页面，已停止圈画。请返回数字扶手重新开始。"
+        GuideLanguage.CANTONESE -> "确认唔到而家嘅设定页面，已经停止圈画。请返数字扶手重新开始。"
+        GuideLanguage.ENGLISH -> "This Settings page is not recognized. Highlighting has stopped. Return to Digital Handrail and start again."
     }
 }
 
@@ -58,6 +55,9 @@ class GuidePreferences(private val context: Context) {
     var active: Boolean
         get() = prefs.getBoolean("active", false)
         set(value) { prefs.edit().putBoolean("active", value).apply() }
+    var initialFontScale: Float
+        get() = prefs.getFloat("initialFontScale", 1f)
+        set(value) { prefs.edit().putFloat("initialFontScale", value).apply() }
     var muted: Boolean
         get() = prefs.getBoolean("muted", false)
         set(value) { prefs.edit().putBoolean("muted", value).apply() }

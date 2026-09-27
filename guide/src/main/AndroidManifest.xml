@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <queries>
-        <package android:name="org.hku4sdg.demotarget" />
+        <package android:name="com.android.settings" />
         <intent><action android:name="android.speech.RecognitionService" /></intent>
     </queries>
     <application android:label="数字扶手" android:theme="@android:style/Theme.Material.Light.NoActionBar">
@@ -15,7 +15,7 @@
             android:name=".GuideAccessibilityService"
             android:exported="true"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:label="数字扶手 · 练习引导">
+            android:label="数字扶手 · 手机引导">
             <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service" />
         </service>

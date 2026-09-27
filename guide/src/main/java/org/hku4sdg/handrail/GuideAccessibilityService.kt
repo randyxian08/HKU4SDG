@@ -7,6 +7,7 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.View
@@ -22,7 +23,6 @@ class GuideAccessibilityService : AccessibilityService() {
     private lateinit var overlay: GuideOverlay
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var privacyPaused = false
     private var shownStep: GuideStep? = null
     private var renderKey: String? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -31,7 +31,7 @@ class GuideAccessibilityService : AccessibilityService() {
         preferences = GuidePreferences(this)
         overlay = GuideOverlay(this)
         tts = TextToSpeech(this) { ttsReady = it == TextToSpeech.SUCCESS }
-        handler.postDelayed({ if (preferences.active && !privacyPaused) render(true) }, 300)
+        handler.postDelayed({ if (preferences.active) render(true) }, 300)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -40,31 +40,17 @@ class GuideAccessibilityService : AccessibilityService() {
             tts?.stop()
             return
         }
-        if (event?.packageName?.toString() != TARGET_PACKAGE) {
-            // Receive window changes globally to remove stale overlays, but never inspect
-            // another app's node tree. Our own overlay may also emit an event.
-            if (rootInActiveWindow?.packageName?.toString() != TARGET_PACKAGE) {
+        if (event?.packageName?.toString() != SETTINGS_PACKAGE) {
+            // Only the registered Settings package can be inspected.
+            if (rootInActiveWindow?.packageName?.toString() != SETTINGS_PACKAGE) {
                 overlay.clear()
                 tts?.stop()
                 renderKey = null
             }
             return
         }
-        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED &&
-            event.source?.viewIdResourceName == "$TARGET_PACKAGE:id/private_entry") {
-            privacyPaused = true
-            shownStep = null
-            renderKey = null
-            tts?.stop()
-            showPause()
-            return
-        }
-        if (privacyPaused) {
-            showPause()
-            return // Never inspect a private page while paused.
-        }
         render()
-        handler.postDelayed({ if (preferences.active && !privacyPaused) render() }, 250)
+        handler.postDelayed({ if (preferences.active) render() }, 250)
     }
 
     override fun onInterrupt() {
@@ -80,31 +66,49 @@ class GuideAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
-    private fun find(root: AccessibilityNodeInfo, id: String): AccessibilityNodeInfo? =
-        root.findAccessibilityNodeInfosByViewId("$TARGET_PACKAGE:id/$id").firstOrNull { it.isVisibleToUser }
+    private fun findNode(root: AccessibilityNodeInfo, predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
+        if (root.isVisibleToUser && predicate(root)) return root
+        for (index in 0 until root.childCount) {
+            val child = root.getChild(index) ?: continue
+            findNode(child, predicate)?.let { return it }
+        }
+        return null
+    }
+
+    private fun header(root: AccessibilityNodeInfo, title: String): Boolean =
+        findNode(root) { it.viewIdResourceName == "$SETTINGS_PACKAGE:id/collapsing_toolbar" &&
+            it.contentDescription?.toString() == title } != null
+
+    private fun clickableAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo {
+        var current = node
+        while (!current.isClickable && current.parent != null) current = current.parent
+        return current
+    }
 
     private fun render(force: Boolean = false) {
         val root = rootInActiveWindow
-        if (root?.packageName?.toString() != TARGET_PACKAGE) {
+        if (root?.packageName?.toString() != SETTINGS_PACKAGE) {
             overlay.clear()
             tts?.stop()
             return
         }
-        // Match only registered demo IDs. No screenshots, free-text fields or arbitrary coordinates.
-        if (find(root, "private_panel") != null) {
-            privacyPaused = true
-            tts?.stop()
-            showPause()
-            return
-        }
+        // Strictly match this tested English Android 15 Settings layout. Unknown layouts stop.
         val target = when {
-            find(root, "done_label") != null -> GuideStep.COMPLETE to null
-            find(root, "font_slider") != null -> GuideStep.SLIDER to find(root, "font_slider")
-            find(root, "open_font_size") != null -> GuideStep.FONT_SIZE to find(root, "open_font_size")
-            find(root, "open_display") != null -> GuideStep.DISPLAY to find(root, "open_display")
+            header(root, "Display size and text") -> {
+                val current = Settings.System.getFloat(contentResolver, FONT_SCALE_KEY, 1f)
+                if (current > preferences.initialFontScale + 0.01f) GuideStep.COMPLETE to null
+                else GuideStep.SLIDER to findNode(root) {
+                    it.className?.toString() == "android.widget.SeekBar" &&
+                        it.contentDescription?.toString() == "Font size" &&
+                        it.viewIdResourceName == "android:id/seekbar"
+                }
+            }
+            header(root, "Display & touch") -> GuideStep.DISPLAY_SIZE to
+                findNode(root) { it.viewIdResourceName == "android:id/title" &&
+                    it.text?.toString() == "Display size and text" }?.let(::clickableAncestor)
             else -> null
         }
-        if (target == null) {
+        if (target == null || (target.first != GuideStep.COMPLETE && target.second == null)) {
             tts?.stop()
             shownStep = null
             renderKey = null
@@ -141,7 +145,7 @@ class GuideAccessibilityService : AccessibilityService() {
         GuideLanguage.entries[(current.ordinal + 1) % GuideLanguage.entries.size]
 
     private fun speak(step: GuideStep) {
-        if (preferences.muted || privacyPaused || !ttsReady) return
+        if (preferences.muted || !ttsReady) return
         val engine = tts ?: return
         val locale = preferences.voiceLanguage.locale
         val support = engine.isLanguageAvailable(locale)
@@ -152,34 +156,18 @@ class GuideAccessibilityService : AccessibilityService() {
         engine.speak(GuideContent.instruction(step, preferences.voiceLanguage), TextToSpeech.QUEUE_FLUSH, null, "guide-$step")
     }
 
-    private fun showPause() {
-        tts?.stop()
-        overlay.showStatus(GuideContent.pause(preferences.textLanguage), true,
-            onResume = {
-                privacyPaused = false
-                // Revalidate the active page; a tap on Continue alone cannot resume guidance.
-                val root = rootInActiveWindow
-                if (root?.packageName?.toString() != TARGET_PACKAGE || find(root, "private_panel") != null) {
-                    privacyPaused = true
-                    showPause()
-                } else {
-                    renderKey = null
-                    render(true)
-                }
-            },
-            onExit = ::endGuide)
-    }
-
     private fun endGuide() {
         preferences.active = false
-        privacyPaused = false
         shownStep = null
         renderKey = null
         tts?.stop()
         overlay.clear()
     }
 
-    companion object { private const val TARGET_PACKAGE = "org.hku4sdg.demotarget" }
+    companion object {
+        private const val SETTINGS_PACKAGE = "com.android.settings"
+        private const val FONT_SCALE_KEY = "font_scale"
+    }
 }
 
 /** Two small accessibility windows: a non-touchable highlight and a touchable card. */
@@ -207,16 +195,16 @@ private class GuideOverlay(private val service: AccessibilityService) {
         if (bounds != null) addRing(bounds, step)
         val root = cardBase()
         if (step == GuideStep.COMPLETE) {
-            root.addView(label("●  练习完成", 14f, Design.forest, true))
+            root.addView(label("●  已完成", 14f, Design.forest, true))
             space(root, 14)
             root.addView(label(message, 21f, Design.ink, true).apply { setLineSpacing(dp(4).toFloat(), 1f) })
             space(root, 19)
-            root.addView(tap("结束练习", Design.forest, Design.surface, 16f, onExit),
+            root.addView(tap("结束引导", Design.forest, Design.surface, 16f, onExit),
                 LinearLayout.LayoutParams(-1, dp(52)))
             addCard(root, null)
             return
         }
-        val number = "第 ${step.ordinal + 1} / 3 步"
+        val number = "第 ${step.ordinal + 1} / 2 步"
         val eyebrow = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
         eyebrow.addView(label("●  正在引导  ·  $number", 13f, Design.forest, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -295,7 +283,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
         includeFontPadding = false
         typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         setPadding(dp(8), dp(8), dp(8), dp(8))
-        minHeight = dp(44)
+        minHeight = dp(48)
         background = Design.shape(fill, dp(13).toFloat())
         setOnClickListener { click() }
     }
