@@ -1,10 +1,12 @@
 package org.hku4sdg.handrail
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
@@ -14,7 +16,7 @@ internal object Design {
     val background = 0xFFF6F4EE.toInt()
     val surface = 0xFFFFFFFF.toInt()
     val ink = 0xFF173B35.toInt()
-    val secondary = 0xFF66736D.toInt()
+    val secondary = 0xFF56645E.toInt()
     val forest = 0xFF17483E.toInt()
     val paleGreen = 0xFFE8F1EB.toInt()
     val orange = 0xFFE8783D.toInt()
@@ -27,6 +29,13 @@ internal object Design {
             cornerRadius = radius
             if (stroke != null) setStroke(strokeWidth, stroke)
         }
+
+    fun ripple(fill: Int, radius: Float, stroke: Int? = null): RippleDrawable =
+        RippleDrawable(
+            ColorStateList.valueOf(0x2417483E),
+            shape(fill, radius, stroke),
+            shape(0xFFFFFFFF.toInt(), radius)
+        )
 }
 
 internal fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()

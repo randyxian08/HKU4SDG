@@ -10,7 +10,7 @@
 
 输入语言、引导文字和语音播报语言可分别选择普通话、粤语和英语。文字输入的任务匹配目前是有限本地规则，**不是 AI 意图理解**；语音识别和播报依赖设备服务，粤语语音质量及真机兼容尚未验收。当前只适配上述模拟器系统页面，其他 Android 品牌、系统语言与版本不应视为已支持。
 
-产品定义来自 [飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)。单 App 的信息架构、设计参照与功能优先级见 [产品体验方案](docs/product-experience.md)，开发与真机验收见 [MVP 开发计划](docs/mvp-plan.md)。
+产品定义来自 [飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)。单 App 的信息架构与功能优先级见 [产品体验方案](docs/product-experience.md)；Apple、Android、OpenAI 和 Anthropic 官方资料与本次界面决定见 [界面研究与改版依据](docs/design-research.md)；开发与真机验收见 [MVP 开发计划](docs/mvp-plan.md)。
 
 ## 本地运行
 
