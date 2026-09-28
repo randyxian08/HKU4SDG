@@ -29,6 +29,15 @@ class TaskMatcherTest {
         assertNull(TaskMatcher.match("Make the photo brighter"))
     }
 
+    @Test fun bookmarkRequiresOfficialSourceAndExactTopic() {
+        assertEquals(GuideTask.CHROME_BOOKMARK,
+            TaskMatcher.match("把政府一站通的长者服务网页收藏起来"))
+        assertEquals(GuideTask.CHROME_BOOKMARK,
+            TaskMatcher.match("Bookmark the GovHK elderly services page"))
+        assertNull(TaskMatcher.match("Bookmark an elderly services page on Facebook"))
+        assertNull(TaskMatcher.match("Bookmark a hospital appointment page"))
+    }
+
     @Test fun keepsSensitiveGoalOutOfCloudIntent() {
         assertTrue(SensitiveGoalGuard.shouldKeepLocal("帮我输入银行卡号 123456789"))
         assertTrue(SensitiveGoalGuard.shouldKeepLocal("What is my password?"))

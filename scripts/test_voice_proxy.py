@@ -124,6 +124,35 @@ class VoiceProxyTest(unittest.TestCase):
             server.server_close()
             thread.join(timeout=2)
 
+    def test_asr_accepts_bounded_pcm_and_rejects_invalid_audio(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), voice_proxy.VoiceHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            base = f"http://127.0.0.1:{server.server_port}/asr"
+            with patch.dict(os.environ, {"VOLCENGINE_API_KEY": "test-key"}), patch(
+                    "asr_client.recognize", return_value="我想收藏網頁") as provider:
+                request = urllib.request.Request(base, data=b"\0" * 16000,
+                    headers={"X-Guide-Language": "cantonese"}, method="POST")
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    self.assertEqual(json.load(response), {"text": "我想收藏網頁"})
+                provider.assert_called_once_with(b"\0" * 16000, "cantonese", "test-key")
+                for audio, language in [(b"\0" * 15998, "english"),
+                                        (b"\0" * 16001, "english"),
+                                        (b"\0" * 16000, "unlisted")]:
+                    with self.subTest(size=len(audio), language=language):
+                        bad = urllib.request.Request(base, data=audio,
+                            headers={"X-Guide-Language": language}, method="POST")
+                        with self.assertRaises(urllib.error.HTTPError) as error:
+                            urllib.request.urlopen(bad, timeout=2)
+                        self.assertEqual(error.exception.code, 400)
+                        error.exception.close()
+                self.assertEqual(provider.call_count, 1)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
 
 if __name__ == "__main__":
     unittest.main()

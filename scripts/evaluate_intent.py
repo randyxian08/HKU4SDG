@@ -21,6 +21,9 @@ BRIGHTNESS_EXCLUDED = ("自动亮度", "adaptive brightness", "调暗", "降低�
 BRIGHTNESS_SUPPORTED = ("调高亮度", "提高亮度", "屏幕太暗", "屏幕好暗", "光度太暗", "加光啲",
                         "increase brightness", "raise brightness", "screen too dim", "screen is too dark",
                         "make the screen brighter")
+BOOKMARK_ACTION = ("收藏", "书签", "書籤", "bookmark", "save this page")
+BOOKMARK_SOURCE = ("政府一站通", "govhk", "gov.hk")
+BOOKMARK_PAGE = ("长者服务", "長者服務", "老人服务", "elderly services", "elderly service page")
 
 
 def local_fallback(text: str) -> dict:
@@ -30,6 +33,10 @@ def local_fallback(text: str) -> dict:
     if not any(part in text for part in BRIGHTNESS_EXCLUDED) and any(
             part in text for part in BRIGHTNESS_SUPPORTED):
         return {"decision": "match", "task_id": "screen_brightness"}
+    if (any(part in text for part in BOOKMARK_ACTION)
+            and any(part in text for part in BOOKMARK_SOURCE)
+            and any(part in text for part in BOOKMARK_PAGE)):
+        return {"decision": "match", "task_id": "chrome_bookmark"}
     return {"decision": "unsupported", "task_id": ""}
 
 

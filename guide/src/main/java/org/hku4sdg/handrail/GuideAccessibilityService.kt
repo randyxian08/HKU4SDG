@@ -25,6 +25,9 @@ class GuideAccessibilityService : AccessibilityService() {
     private var cloudTts: CloudTts? = null
     private var ttsReady = false
     private var shownStep: GuideStep? = null
+    private var chromeVerified = false
+    private var chromeSaveOffered = false
+    private var currentSessionId = -1
     private var renderKey: String? = null
     private val handler = Handler(Looper.getMainLooper())
 
@@ -50,7 +53,7 @@ class GuideAccessibilityService : AccessibilityService() {
                 tts?.stop()
                 cloudTts?.stop()
                 renderKey = null
-                shownStep = null
+                if (preferences.activeTask != GuideTask.CHROME_BOOKMARK) shownStep = null
             }
             return
         }
@@ -92,8 +95,11 @@ class GuideAccessibilityService : AccessibilityService() {
         return current
     }
 
-    private fun allowedPackages(): Set<String> = if (preferences.activeTask == GuideTask.SCREEN_BRIGHTNESS)
-        setOf(SETTINGS_PACKAGE, SYSTEMUI_PACKAGE) else setOf(SETTINGS_PACKAGE)
+    private fun allowedPackages(): Set<String> = when (preferences.activeTask) {
+        GuideTask.FONT_SIZE -> setOf(SETTINGS_PACKAGE)
+        GuideTask.SCREEN_BRIGHTNESS -> setOf(SETTINGS_PACKAGE, SYSTEMUI_PACKAGE)
+        GuideTask.CHROME_BOOKMARK -> setOf(CHROME_PACKAGE)
+    }
 
     private fun fontTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
         if (root.packageName?.toString() != SETTINGS_PACKAGE) return null
@@ -147,24 +153,61 @@ class GuideAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun chromeTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        if (root.packageName?.toString() != CHROME_PACKAGE) return null
+        val address = findNode(root) { it.viewIdResourceName == "$CHROME_PACKAGE:id/url_bar" }
+        if (address != null) {
+            val url = address.text?.toString().orEmpty()
+            chromeVerified = url == "www.gov.hk/tc/residents/housing/socialservices/?subcat=elderly"
+            if (!chromeVerified) {
+                chromeSaveOffered = false
+            }
+        }
+        if (!chromeVerified) return null
+        if (shownStep == GuideStep.CHROME_COMPLETE) return GuideStep.CHROME_COMPLETE to null
+        val edit = findNode(root) { it.viewIdResourceName == "$CHROME_PACKAGE:id/button_two" &&
+            it.contentDescription?.toString() == "Edit bookmark" }
+        if (edit != null) return GuideStep.CHROME_COMPLETE to null
+        val save = findNode(root) { it.viewIdResourceName == "$CHROME_PACKAGE:id/button_two" &&
+            it.contentDescription?.toString() == "Bookmark" }
+        if (save != null && shownStep in setOf(GuideStep.CHROME_MENU, GuideStep.CHROME_SAVE,
+                GuideStep.CHROME_VERIFY)) {
+            chromeSaveOffered = true
+            return GuideStep.CHROME_SAVE to save
+        }
+        val menu = findNode(root) { it.viewIdResourceName == "$CHROME_PACKAGE:id/menu_button" &&
+            it.contentDescription?.toString() == "Customize and control Google Chrome" }
+        return if (address != null && menu != null)
+            (if (chromeSaveOffered) GuideStep.CHROME_VERIFY else GuideStep.CHROME_MENU) to menu
+        else null
+    }
+
     private fun render(force: Boolean = false) {
+        if (currentSessionId != preferences.guideSessionId) {
+            currentSessionId = preferences.guideSessionId
+            shownStep = null
+            chromeVerified = false
+            chromeSaveOffered = false
+            renderKey = null
+        }
         val root = rootInActiveWindow
         if (root?.packageName?.toString() !in allowedPackages()) {
             overlay.clear()
             tts?.stop()
             cloudTts?.stop()
-            shownStep = null
+            if (preferences.activeTask != GuideTask.CHROME_BOOKMARK) shownStep = null
             return
         }
-        // Strictly match the tested English Android 15 Settings and brightness dialog layouts.
+        // Strictly match the tested Android 15 Settings or Chrome 124 public-page layouts.
         val target = when (preferences.activeTask) {
             GuideTask.FONT_SIZE -> fontTarget(root)
             GuideTask.SCREEN_BRIGHTNESS -> brightnessTarget(root)
+            GuideTask.CHROME_BOOKMARK -> chromeTarget(root)
         }
         if (target == null || (!target.first.isComplete && target.second == null)) {
             tts?.stop()
             cloudTts?.stop()
-            if (root.packageName?.toString() != SYSTEMUI_PACKAGE) shownStep = null
+            if (root.packageName?.toString() !in setOf(SYSTEMUI_PACKAGE, CHROME_PACKAGE)) shownStep = null
             renderKey = null
             overlay.showStatus(GuideContent.unknown(preferences.textLanguage), false,
                 onResume = {}, onExit = ::endGuide)
@@ -222,6 +265,8 @@ class GuideAccessibilityService : AccessibilityService() {
     private fun endGuide() {
         preferences.active = false
         shownStep = null
+        chromeVerified = false
+        chromeSaveOffered = false
         renderKey = null
         tts?.stop()
         cloudTts?.stop()
@@ -231,6 +276,7 @@ class GuideAccessibilityService : AccessibilityService() {
     companion object {
         private const val SETTINGS_PACKAGE = "com.android.settings"
         private const val SYSTEMUI_PACKAGE = "com.android.systemui"
+        private const val CHROME_PACKAGE = "com.android.chrome"
         private const val FONT_SCALE_KEY = "font_scale"
     }
 }
@@ -269,7 +315,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
             addCard(root, null)
             return
         }
-        val number = "第 ${step.number} / 2 步"
+        val number = "第 ${step.number} / ${if (step.task == GuideTask.CHROME_BOOKMARK) 3 else 2} 步"
         val eyebrow = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
         eyebrow.addView(label("●  正在引导  ·  $number", 13f, Design.forest, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))

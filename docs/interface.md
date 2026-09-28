@@ -1,6 +1,6 @@
 # 数字扶手｜Android 产品界面与当前验证
 
-目标是一款可安装的 Android 应用。首页直接询问目标，提供输入/说话和“把字调大”“调高屏幕亮度”两项任务；任务详情先确认范围，再在真实系统设置中以圈画和可折叠文字卡指引。用户亲手操作，不由服务代点。三种语言分别用于输入、引导文字／AI 提示和语音播报；首页及部分操作控件仍以中文显示。
+目标是一款可安装的 Android 应用。首页直接询问目标，提供输入/说话和三项任务：调大字体、调高亮度、在 Chrome 收藏 GovHK 长者服务网页。任务详情先确认范围，再在已审核的系统设置或 Chrome 页面中以圈画和可折叠文字卡指引。用户亲手操作，不由服务代点。三种语言分别用于输入、引导文字／AI 提示和语音播报；首页及部分操作控件仍以中文显示。
 
 ## 当前截图
 
@@ -12,4 +12,8 @@
 
 亮度任务也在同一模拟器的真实系统设置里完成：[AI 识别后确认任务](screenshots/android15-brightness-ai-match.png) → [圈出 Brightness level](screenshots/android15-brightness-step1.png) → [圈出系统亮度滑杆](screenshots/android15-brightness-step2.png) → [用户拖动后显示完成](screenshots/android15-brightness-done.png)。这次回归中 `SCREEN_BRIGHTNESS` 从 102 变为 194；系统亮度弹窗滑杆在拖动后短暂隐藏，应用读取到实际亮度变化后才显示完成。亮度路径目前以手动亮度模式、起始亮度未达上限为演示条件。自动亮度、最大值与其他系统皮肤未验收。
 
-当前首页已按[界面研究与改版依据](design-research.md)重排：两个真实任务是主入口，权限是一行状态，文字/语音输入在底部；任务确认页说明操作、风险和已验证的设备。已在模拟器检查 1.0 与 1.5 字体比例、软键盘避让、任务页状态保留以及可点对象的无障碍角色。截图与代码不能证明其他 Android 品牌/系统语言、真机触控、TalkBack 实际朗读顺序、真人语音识别或粤语 TTS 通过。旧的 [模拟练习截图](screenshots/android15-step.png) 仅留作内部测试历史，不作为产品交付。
+第三项是在**真实 Chrome 124** 打开 GovHK 长者服务公开网页：[三任务首页](screenshots/android15-three-task-home.png) → [任务确认](screenshots/android15-chrome-task.png) → [圈出菜单](screenshots/android15-chrome-step1.png) → [圈出书签星标](screenshots/android15-chrome-step2.png) → [再次打开菜单核验](screenshots/android15-chrome-step3.png) → [Chrome 显示 `Edit bookmark` 后完成](screenshots/android15-chrome-complete.png)。用户只安装数字扶手一个 APK，在 Chrome 内亲自点击。切到[不匹配的网页](screenshots/android15-chrome-wrong-page.png)时圈画撤下并显示未知页面。此路径只针对该公开网址、当前 Chrome 版本和模拟器布局；不代表能指导任意浏览器页面，也不读取网页正文。
+
+Debug 模拟器版新增录音、结束、转写预览状态。首次云端语音使用有[独立的音频去向提示](screenshots/android15-asr-consent.png)；此前只同意 Android 设备识别的用户也须单独确认。三语合成音频经真实火山 ASR 返回文字；模拟器内麦克风静音时，[失败提示](screenshots/android15-asr-silence.png)允许继续文字或任务卡。没有真人三语麦克风输入通过的证据，尤其不能由合成音频测试推断粤语老人的真实识别率。
+
+当前首页已按[界面研究与改版依据](design-research.md)重排：三个真实任务是主入口，权限是一行状态，文字/语音输入在底部；任务确认页说明操作、风险和已验证的设备。已在模拟器检查 1.0 与 1.5 字体比例、软键盘避让、任务页状态保留以及可点对象的无障碍角色。截图与代码不能证明其他 Android 品牌/系统语言、真机触控、TalkBack 实际朗读顺序、真人语音识别或粤语 TTS 通过。旧的 [模拟练习截图](screenshots/android15-step.png) 仅留作内部测试历史，不作为产品交付。

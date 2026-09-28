@@ -166,5 +166,47 @@
     "text": "Make the photo brighter",
     "expected": "unsupported",
     "expected_task_id": ""
+  },
+  {
+    "language": "mandarin",
+    "text": "把香港政府一站通的长者服务网页收藏起来",
+    "expected": "match",
+    "expected_task_id": "chrome_bookmark"
+  },
+  {
+    "language": "cantonese",
+    "text": "帮我将政府一站通嘅長者服務网页加书籤",
+    "expected": "match",
+    "expected_task_id": "chrome_bookmark"
+  },
+  {
+    "language": "english",
+    "text": "Bookmark the GovHK elderly services page in Chrome",
+    "expected": "match",
+    "expected_task_id": "chrome_bookmark"
+  },
+  {
+    "language": "mandarin",
+    "text": "帮我收藏一个网页",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "Bookmark a hospital appointment page",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "Bookmark the elderly services page on Facebook",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "Book an elderly services appointment",
+    "expected": "unsupported",
+    "expected_task_id": ""
   }
 ]

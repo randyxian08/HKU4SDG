@@ -16,7 +16,8 @@ enum class GuideLanguage(val label: String, val tag: String) {
 }
 
 enum class GuideTask(val id: String) {
-    FONT_SIZE("font_size"), SCREEN_BRIGHTNESS("screen_brightness");
+    FONT_SIZE("font_size"), SCREEN_BRIGHTNESS("screen_brightness"),
+    CHROME_BOOKMARK("chrome_bookmark");
 
     companion object {
         fun fromId(id: String) = entries.firstOrNull { it.id == id }
@@ -29,9 +30,13 @@ enum class GuideStep(val task: GuideTask, val number: Int) {
     COMPLETE(GuideTask.FONT_SIZE, 2),
     BRIGHTNESS_ROW(GuideTask.SCREEN_BRIGHTNESS, 1),
     BRIGHTNESS_SLIDER(GuideTask.SCREEN_BRIGHTNESS, 2),
-    BRIGHTNESS_COMPLETE(GuideTask.SCREEN_BRIGHTNESS, 2);
+    BRIGHTNESS_COMPLETE(GuideTask.SCREEN_BRIGHTNESS, 2),
+    CHROME_MENU(GuideTask.CHROME_BOOKMARK, 1),
+    CHROME_SAVE(GuideTask.CHROME_BOOKMARK, 2),
+    CHROME_VERIFY(GuideTask.CHROME_BOOKMARK, 3),
+    CHROME_COMPLETE(GuideTask.CHROME_BOOKMARK, 3);
 
-    val isComplete get() = this == COMPLETE || this == BRIGHTNESS_COMPLETE
+    val isComplete get() = this == COMPLETE || this == BRIGHTNESS_COMPLETE || this == CHROME_COMPLETE
 }
 
 /** Fixed copy for the reviewed Android 15 / Pixel 7 emulator flow. Native-speaker review is pending. */
@@ -43,9 +48,9 @@ object GuideContent {
     }
 
     fun intentClarify(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "你想调大手机的字，还是调亮屏幕？请说得具体一点。"
-        GuideLanguage.CANTONESE -> "你系想调大手机啲字，定系调光啲个屏幕？请讲清楚啲。"
-        GuideLanguage.ENGLISH -> "Do you want larger text or a brighter screen? Please be more specific."
+        GuideLanguage.MANDARIN -> "你想调大手机的字、调亮屏幕，还是收藏长者服务网页？请说得具体一点。"
+        GuideLanguage.CANTONESE -> "你系想调大手机啲字、调光啲个屏幕，定系收藏长者服务网页？请讲清楚啲。"
+        GuideLanguage.ENGLISH -> "Do you want larger text, a brighter screen, or to bookmark the elderly services page? Please be more specific."
     }
 
     fun intentUnsupported(language: GuideLanguage) = when (language) {
@@ -74,6 +79,10 @@ object GuideContent {
             GuideStep.BRIGHTNESS_ROW -> "请点圈住的“Brightness level”。"
             GuideStep.BRIGHTNESS_SLIDER -> "请亲手把圈住的亮度滑块向右拖动。"
             GuideStep.BRIGHTNESS_COMPLETE -> "已检测到屏幕亮度提高。请看看现在是否更容易看清。"
+            GuideStep.CHROME_MENU -> "请点圈住的 Chrome 右上角菜单。"
+            GuideStep.CHROME_SAVE -> "请点圈住的“Bookmark”星标，收藏这个公开网页。"
+            GuideStep.CHROME_VERIFY -> "请再次打开圈住的菜单，检查书签是否已保存。"
+            GuideStep.CHROME_COMPLETE -> "已确认 Chrome 显示“Edit bookmark”，这个网页已收藏。"
         }
         GuideLanguage.CANTONESE -> when (step) {
             GuideStep.DISPLAY_SIZE -> "请㩒圈住嘅「Display size and text」。"
@@ -82,6 +91,10 @@ object GuideContent {
             GuideStep.BRIGHTNESS_ROW -> "请㩒圈住嘅「Brightness level」。"
             GuideStep.BRIGHTNESS_SLIDER -> "请自己将圈住嘅光度滑桿向右拖。"
             GuideStep.BRIGHTNESS_COMPLETE -> "屏幕光度已经提高。睇下而家系咪清楚啲。"
+            GuideStep.CHROME_MENU -> "请㩒圈住嘅 Chrome 右上角選單。"
+            GuideStep.CHROME_SAVE -> "请㩒圈住嘅「Bookmark」星號，收藏呢個公開網頁。"
+            GuideStep.CHROME_VERIFY -> "请再打开圈住嘅選單，检查書籤係咪已儲存。"
+            GuideStep.CHROME_COMPLETE -> "已確認 Chrome 顯示「Edit bookmark」，呢個網頁已收藏。"
         }
         GuideLanguage.ENGLISH -> when (step) {
             GuideStep.DISPLAY_SIZE -> "Tap the circled “Display size and text” row."
@@ -90,6 +103,10 @@ object GuideContent {
             GuideStep.BRIGHTNESS_ROW -> "Tap the circled “Brightness level” row."
             GuideStep.BRIGHTNESS_SLIDER -> "Drag the circled brightness slider to the right."
             GuideStep.BRIGHTNESS_COMPLETE -> "Screen brightness has increased. Check whether it is easier to see."
+            GuideStep.CHROME_MENU -> "Tap the circled Chrome menu in the top right."
+            GuideStep.CHROME_SAVE -> "Tap the circled Bookmark star to save this public page."
+            GuideStep.CHROME_VERIFY -> "Open the circled menu again to check that the bookmark was saved."
+            GuideStep.CHROME_COMPLETE -> "Chrome now shows “Edit bookmark”, confirming this page was saved."
         }
     }
 
@@ -100,9 +117,9 @@ object GuideContent {
     }
 
     fun unknown(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "无法确认当前设置页面，已停止圈画。请返回数字扶手重新开始。"
-        GuideLanguage.CANTONESE -> "确认唔到而家嘅设定页面，已经停止圈画。请返数字扶手重新开始。"
-        GuideLanguage.ENGLISH -> "This Settings page is not recognized. Highlighting has stopped. Return to Digital Handrail and start again."
+        GuideLanguage.MANDARIN -> "无法确认当前页面，已停止圈画。请返回数字扶手重新开始。"
+        GuideLanguage.CANTONESE -> "确认唔到而家嘅頁面，已经停止圈畫。请返数字扶手重新开始。"
+        GuideLanguage.ENGLISH -> "This page is not recognized. Highlighting has stopped. Return to Digital Handrail and start again."
     }
 }
 
@@ -120,6 +137,9 @@ class GuidePreferences(private val context: Context) {
     var activeTask: GuideTask
         get() = GuideTask.fromId(prefs.getString("activeTask", "") ?: "") ?: GuideTask.FONT_SIZE
         set(value) { prefs.edit().putString("activeTask", value.id).apply() }
+    var guideSessionId: Int
+        get() = prefs.getInt("guideSessionId", 0)
+        set(value) { prefs.edit().putInt("guideSessionId", value).apply() }
     var muted: Boolean
         get() = prefs.getBoolean("muted", false)
         set(value) { prefs.edit().putBoolean("muted", value).apply() }
@@ -129,6 +149,9 @@ class GuidePreferences(private val context: Context) {
     var speechConsent: Boolean
         get() = prefs.getBoolean("speechConsent", false)
         set(value) { prefs.edit().putBoolean("speechConsent", value).apply() }
+    var cloudAsrConsent: Boolean
+        get() = prefs.getBoolean("cloudAsrConsent", false)
+        set(value) { prefs.edit().putBoolean("cloudAsrConsent", value).apply() }
     var inputLanguage: GuideLanguage
         get() = language("input")
         set(value) = setLanguage("input", value)
@@ -148,6 +171,7 @@ object TaskMatcher {
     fun match(input: String): GuideTask? = when {
         matchesFontSize(input) -> GuideTask.FONT_SIZE
         matchesBrightness(input) -> GuideTask.SCREEN_BRIGHTNESS
+        matchesChromeBookmark(input) -> GuideTask.CHROME_BOOKMARK
         else -> null
     }
 
@@ -169,6 +193,15 @@ object TaskMatcher {
         return listOf("调高亮度", "提高亮度", "屏幕太暗", "屏幕好暗", "光度太暗", "加光啲",
             "increase brightness", "raise brightness", "screen too dim", "screen is too dark",
             "make the screen brighter").any { it in text }
+    }
+
+    fun matchesChromeBookmark(input: String): Boolean {
+        val text = input.trim().lowercase(Locale.ROOT)
+        val save = listOf("收藏", "书签", "書籤", "bookmark", "save this page").any { it in text }
+        val source = listOf("政府一站通", "govhk", "gov.hk").any { it in text }
+        val page = listOf("长者服务", "長者服務", "老人服务", "elderly services",
+            "elderly service page").any { it in text }
+        return save && source && page && !SensitiveGoalGuard.shouldKeepLocal(text)
     }
 }
 

@@ -6,6 +6,7 @@ import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -34,7 +35,9 @@ class MainActivity : Activity() {
     private lateinit var serviceDot: TextView
     private lateinit var serviceRowView: LinearLayout
     private lateinit var speechStatus: TextView
+    private lateinit var speechButton: TextView
     private lateinit var intentClient: IntentClient
+    private lateinit var cloudAsr: CloudAsr
     private var selectedTask = GuideTask.FONT_SIZE
     private var taskSuggestedByAi = false
     private var recognizer: SpeechRecognizer? = null
@@ -43,6 +46,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         preferences = GuidePreferences(this)
         intentClient = IntentClient(this)
+        cloudAsr = CloudAsr(this)
         selectedTask = savedInstanceState?.getString("selectedTask")?.let(GuideTask::fromId)
             ?: GuideTask.FONT_SIZE
         taskSuggestedByAi = savedInstanceState?.getBoolean("taskSuggestedByAi") ?: false
@@ -107,7 +111,7 @@ class MainActivity : Activity() {
 
         val section = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         section.addView(text("可用引导", 18f, Design.ink, true), LinearLayout.LayoutParams(0, -2, 1f))
-        section.addView(text("2 项", 14f, Design.secondary))
+        section.addView(text("3 项", 14f, Design.secondary))
         body.addView(section)
         space(body, 14)
 
@@ -168,6 +172,37 @@ class MainActivity : Activity() {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(dp(28), dp(48)))
         body.addView(brightnessTask)
+        space(body, 12)
+        val chromeTask = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(17), dp(18), dp(16), dp(18))
+            background = Design.ripple(Design.surface, dp(22).toFloat(), Design.line)
+            markAsButton()
+            contentDescription = "收藏长者服务网页，在 Chrome 操作，约一分钟。查看任务"
+            setOnClickListener {
+                selectedTask = GuideTask.CHROME_BOOKMARK
+                taskSuggestedByAi = false
+                showTask()
+            }
+        }
+        chromeTask.addView(text("☆", 25f, Design.forest, true, Gravity.CENTER).apply {
+            background = Design.shape(Design.paleGreen, dp(18).toFloat())
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(58), dp(58)))
+        val chromeCopy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), 0, 0, 0)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        chromeCopy.addView(text("收藏长者服务网页", 21f, Design.ink, true))
+        space(chromeCopy, 4)
+        chromeCopy.addView(text("Chrome · 约 1 分钟", 15f, Design.secondary))
+        chromeTask.addView(chromeCopy, LinearLayout.LayoutParams(0, -2, 1f))
+        chromeTask.addView(text("›", 28f, Design.forest, gravity = Gravity.CENTER).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(28), dp(48)))
+        body.addView(chromeTask)
         space(body, 18)
 
         val serviceRow = LinearLayout(this).apply {
@@ -229,9 +264,10 @@ class MainActivity : Activity() {
             }
         }
         composerRow.addView(input, LinearLayout.LayoutParams(0, dp(52), 1f))
-        composerRow.addView(action("说话", Design.paleGreen, Design.forest, 52) { beginListening() }.apply {
+        speechButton = action("说话", Design.paleGreen, Design.forest, 52) { beginListening() }.apply {
             contentDescription = "语音输入任务"
-        }, LinearLayout.LayoutParams(dp(64), dp(52)))
+        }
+        composerRow.addView(speechButton, LinearLayout.LayoutParams(dp(64), dp(52)))
         composerRow.addView(View(this), LinearLayout.LayoutParams(dp(6), 1))
         composerRow.addView(action("→", Design.forest, Design.surface, 52) { submitGoal() }.apply {
             contentDescription = "查看输入对应的任务"
@@ -239,7 +275,7 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         composer.addView(composerRow)
         space(composer, 7)
-        composer.addView(text("使用在线任务识别时，只发送你提交的目标文字；不会发送屏幕或录音。", 14f, Design.secondary))
+        composer.addView(text("AI 任务识别只接收你确认提交的文字；语音输入需你主动录音。不会发送屏幕。", 14f, Design.secondary))
         space(composer, 4)
         speechStatus = text("", 16f, Design.ink, true).apply {
             visibility = View.GONE
@@ -384,6 +420,7 @@ class MainActivity : Activity() {
     private fun showTask() {
         screen = Screen.TASK
         val brightness = selectedTask == GuideTask.SCREEN_BRIGHTNESS
+        val chrome = selectedTask == GuideTask.CHROME_BOOKMARK
         window.statusBarColor = Design.background
         window.navigationBarColor = Design.background
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
@@ -405,19 +442,26 @@ class MainActivity : Activity() {
         topBar.addView(text("任务确认", 17f, Design.ink, true).apply { setPadding(dp(7), 0, 0, 0) })
         body.addView(topBar)
         space(body, 31)
-        body.addView(text("系统设置  ·  约 1 分钟", 14f, Design.forest, true))
+        body.addView(text(if (chrome) "Chrome  ·  约 1 分钟" else "系统设置  ·  约 1 分钟", 14f, Design.forest, true))
         space(body, 9)
-        body.addView(text(if (brightness) "调高屏幕亮度" else "把字调大", 30f, Design.ink, true))
+        body.addView(text(when {
+            chrome -> "收藏长者服务网页"
+            brightness -> "调高屏幕亮度"
+            else -> "把字调大"
+        }, 30f, Design.ink, true))
         space(body, 12)
         if (taskSuggestedByAi) {
             body.addView(text(GuideContent.intentMatched(preferences.textLanguage), 15f, Design.forest, true))
             space(body, 10)
         }
-        body.addView(text("接下来会打开手机设置。数字扶手只圈出下一步，点击和拖动都由你完成。", 17f, Design.secondary).apply {
+        body.addView(text(if (chrome)
+            "接下来会在 Chrome 打开香港政府一站通的公开长者服务网页。数字扶手只圈出下一步，收藏由你亲手完成。"
+            else "接下来会打开手机设置。数字扶手只圈出下一步，点击和拖动都由你完成。",
+            17f, Design.secondary).apply {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
         space(body, 31)
-        body.addView(text("你会做两步", 18f, Design.ink, true))
+        body.addView(text(if (chrome) "你会做三步" else "你会做两步", 18f, Design.ink, true))
         space(body, 14)
         val steps = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -432,9 +476,21 @@ class MainActivity : Activity() {
             row.addView(text(copy, 17f, Design.ink, true).apply { setPadding(dp(13), 0, 0, 0) })
             steps.addView(row)
         }
-        step("1", if (brightness) "找到 Brightness level" else "找到 Display size and text")
+        step("1", when {
+            chrome -> "打开 Chrome 右上角菜单"
+            brightness -> "找到 Brightness level"
+            else -> "找到 Display size and text"
+        })
         space(steps, 6)
-        step("2", if (brightness) "调整屏幕亮度滑块" else "调整 Font size 滑块")
+        step("2", when {
+            chrome -> "点 Bookmark 星标收藏"
+            brightness -> "调整屏幕亮度滑块"
+            else -> "调整 Font size 滑块"
+        })
+        if (chrome) {
+            space(steps, 6)
+            step("3", "再次打开菜单，确认已收藏")
+        }
         body.addView(steps)
         space(body, 22)
         val scope = LinearLayout(this).apply {
@@ -444,7 +500,10 @@ class MainActivity : Activity() {
         }
         scope.addView(text("已验证的设备", 14f, Design.forest, true))
         space(scope, 6)
-        scope.addView(text("Android 15 / Pixel 7 模拟器，英文系统设置。其他手机的页面不同；认不出时会停下。", 15f, Design.ink).apply {
+        scope.addView(text(if (chrome)
+            "Android 15 / Pixel 7 模拟器，Chrome 124 和政府一站通公开网页。浏览器或网页改变时会停止圈画；这不是政府合作服务。"
+            else "Android 15 / Pixel 7 模拟器，英文系统设置。其他手机的页面不同；认不出时会停下。",
+            15f, Design.ink).apply {
             setLineSpacing(dp(3).toFloat(), 1f)
         })
         body.addView(scope)
@@ -460,10 +519,15 @@ class MainActivity : Activity() {
             setPadding(dp(22), dp(10), dp(22), dp(13))
             setBackgroundColor(Design.background)
         }
-        footer.addView(text(if (brightness) "这会实际改变手机的屏幕亮度" else "这会实际改变手机的字体大小",
+        footer.addView(text(when {
+            chrome -> "这会在 Chrome 保存一个公开网页书签"
+            brightness -> "这会实际改变手机的屏幕亮度"
+            else -> "这会实际改变手机的字体大小"
+        },
             14f, Design.secondary, gravity = Gravity.CENTER))
         space(footer, 10)
-        footer.addView(action("打开系统设置，开始引导", Design.forest, Design.surface, 60) { startSettingsGuide() })
+        footer.addView(action(if (chrome) "打开 Chrome，开始引导" else "打开系统设置，开始引导",
+            Design.forest, Design.surface, 60) { startGuide() })
         root.addView(footer)
         root.setOnApplyWindowInsetsListener { _, insets ->
             val top = if (Build.VERSION.SDK_INT >= 30)
@@ -533,11 +597,11 @@ class MainActivity : Activity() {
         return body
     }
 
-    private fun startSettingsGuide() {
+    private fun startGuide() {
         if (!serviceEnabled()) {
             AlertDialog.Builder(this)
                 .setTitle("先开启引导服务")
-                .setMessage("数字扶手需要无障碍服务才能在系统设置上圈出下一步。开启后回到这里继续；操作始终由你完成。")
+                .setMessage("数字扶手需要无障碍服务才能在其他应用上圈出下一步。开启后回到这里继续；操作始终由你完成。")
                 .setNegativeButton("稍后", null)
                 .setPositiveButton("去设置") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                 .show()
@@ -562,16 +626,21 @@ class MainActivity : Activity() {
                         .setPositiveButton("知道了", null).show()
                     return
                 }
-            } else {
+            } else if (selectedTask == GuideTask.FONT_SIZE) {
                 preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", 1f)
             }
             preferences.activeTask = selectedTask
+            preferences.guideSessionId += 1
             preferences.active = true
             preferences.collapsed = false
-            startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+            if (selectedTask == GuideTask.CHROME_BOOKMARK) {
+                startActivity(Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm"))
+                    .setPackage("com.android.chrome"))
+            } else startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
         } catch (_: Exception) {
             preferences.active = false
-            Toast.makeText(this, "无法打开系统显示设置，请稍后重试。", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "无法打开目标应用，请稍后重试。", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -581,17 +650,52 @@ class MainActivity : Activity() {
     }
 
     private fun beginListening() {
-        if (!preferences.speechConsent) {
+        if (cloudAsr.isRecording()) {
+            cloudAsr.stop()
+            speechButton.text = "说话"
+            setInputStatus(speechMessage("正在识别…", "识别紧…", "Recognizing…"))
+            return
+        }
+        if (if (cloudAsr.enabled) !preferences.cloudAsrConsent else !preferences.speechConsent) {
             AlertDialog.Builder(this)
                 .setTitle("启用语音输入？")
-                .setMessage("点按说话后，音频会交给设备提供的语音识别服务处理；该服务可能联网，具体保留方式取决于设备设置。你也可以一直使用文字或任务卡。")
+                .setMessage(if (cloudAsr.enabled)
+                    "仅在你点按说话后录音；点结束后，录音会经本机开发代理发送到火山引擎识别。应用和代理不会保存音频。识别文字会先显示给你确认。也可以使用文字或任务卡。"
+                    else "点按说话后，音频会交给设备提供的语音识别服务处理；该服务可能联网，具体保留方式取决于设备设置。你也可以一直使用文字或任务卡。")
                 .setNegativeButton("不用语音", null)
-                .setPositiveButton("继续") { _, _ -> preferences.speechConsent = true; beginListening() }
+                .setPositiveButton("继续") { _, _ ->
+                    if (cloudAsr.enabled) preferences.cloudAsrConsent = true
+                    else preferences.speechConsent = true
+                    beginListening()
+                }
                 .show()
             return
         }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 10)
+            return
+        }
+        if (cloudAsr.enabled) {
+            val started = cloudAsr.start(preferences.inputLanguage,
+                onCaptured = {
+                    if (::speechButton.isInitialized) speechButton.text = "说话"
+                    setInputStatus(speechMessage("正在识别…", "识别紧…", "Recognizing…"))
+                },
+                onResult = { transcript ->
+                    if (!transcript.isNullOrBlank()) {
+                        input.setText(transcript)
+                        setInputStatus(speechMessage("识别为：$transcript。确认后点箭头。",
+                            "识别到：$transcript。确认之后㩒箭嘴。",
+                            "Heard: $transcript. Check it, then tap the arrow."))
+                    } else setInputStatus(speechMessage("没有听清，请改用文字或任务卡。",
+                        "听唔清楚，请用文字或者任务卡。", "Could not recognize speech. Try text or a task card."))
+                })
+            if (started) {
+                speechButton.text = "结束"
+                setInputStatus(speechMessage("正在录音，完成后点“结束”。最多 8 秒。",
+                    "录音紧，讲完㩒「结束」。最多 8 秒。", "Recording. Tap Stop when done, up to 8 seconds."))
+            } else setInputStatus(speechMessage("麦克风暂时不可用，请使用文字或任务卡。",
+                "麦克风暂时用唔到，请用文字或者任务卡。", "Microphone unavailable. Try text or a task card."))
             return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -624,6 +728,12 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun speechMessage(mandarin: String, cantonese: String, english: String) = when (preferences.textLanguage) {
+        GuideLanguage.MANDARIN -> mandarin
+        GuideLanguage.CANTONESE -> cantonese
+        GuideLanguage.ENGLISH -> english
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 10 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginListening()
@@ -631,6 +741,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         recognizer?.destroy()
+        cloudAsr.close()
         intentClient.close()
         super.onDestroy()
     }
