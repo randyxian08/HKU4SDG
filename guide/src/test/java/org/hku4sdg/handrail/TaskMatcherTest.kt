@@ -1,6 +1,8 @@
 package org.hku4sdg.handrail
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,6 +19,14 @@ class TaskMatcherTest {
         assertFalse(TaskMatcher.matchesFontSize("Send a text message"))
         assertFalse(TaskMatcher.matchesFontSize("Make the text bigger in WhatsApp"))
         assertFalse(TaskMatcher.matchesFontSize("把字体调小"))
+    }
+
+    @Test fun distinguishesBrightnessFromFontAndOtherContent() {
+        assertEquals(GuideTask.SCREEN_BRIGHTNESS, TaskMatcher.match("屏幕太暗了，请调高亮度"))
+        assertEquals(GuideTask.SCREEN_BRIGHTNESS, TaskMatcher.match("Make the screen brighter"))
+        assertEquals(GuideTask.FONT_SIZE, TaskMatcher.match("把字体调大"))
+        assertNull(TaskMatcher.match("Please lower the screen brightness"))
+        assertNull(TaskMatcher.match("Make the photo brighter"))
     }
 
     @Test fun keepsSensitiveGoalOutOfCloudIntent() {

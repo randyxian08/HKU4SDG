@@ -35,6 +35,7 @@ class MainActivity : Activity() {
     private lateinit var serviceRowView: LinearLayout
     private lateinit var speechStatus: TextView
     private lateinit var intentClient: IntentClient
+    private var selectedTask = GuideTask.FONT_SIZE
     private var taskSuggestedByAi = false
     private var recognizer: SpeechRecognizer? = null
 
@@ -42,6 +43,8 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         preferences = GuidePreferences(this)
         intentClient = IntentClient(this)
+        selectedTask = savedInstanceState?.getString("selectedTask")?.let(GuideTask::fromId)
+            ?: GuideTask.FONT_SIZE
         taskSuggestedByAi = savedInstanceState?.getBoolean("taskSuggestedByAi") ?: false
         when (savedInstanceState?.getString("screen")?.let { runCatching { Screen.valueOf(it) }.getOrNull() }) {
             Screen.TASK -> showTask()
@@ -56,6 +59,7 @@ class MainActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("screen", screen.name)
         outState.putBoolean("taskSuggestedByAi", taskSuggestedByAi)
+        outState.putString("selectedTask", selectedTask.id)
         if (::input.isInitialized) outState.putString("goal", input.text.toString())
         super.onSaveInstanceState(outState)
     }
@@ -103,7 +107,7 @@ class MainActivity : Activity() {
 
         val section = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         section.addView(text("可用引导", 18f, Design.ink, true), LinearLayout.LayoutParams(0, -2, 1f))
-        section.addView(text("1 项", 14f, Design.secondary))
+        section.addView(text("2 项", 14f, Design.secondary))
         body.addView(section)
         space(body, 14)
 
@@ -114,7 +118,7 @@ class MainActivity : Activity() {
             background = Design.ripple(Design.surface, dp(22).toFloat(), Design.line)
             markAsButton()
             contentDescription = "把字调大，系统设置，约一分钟。查看任务"
-            setOnClickListener { taskSuggestedByAi = false; showTask() }
+            setOnClickListener { selectedTask = GuideTask.FONT_SIZE; taskSuggestedByAi = false; showTask() }
         }
         task.addView(text("Aa", 21f, Design.forest, true, Gravity.CENTER).apply {
             background = Design.shape(Design.paleGreen, dp(18).toFloat())
@@ -133,6 +137,37 @@ class MainActivity : Activity() {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(dp(28), dp(48)))
         body.addView(task)
+        space(body, 12)
+        val brightnessTask = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(17), dp(18), dp(16), dp(18))
+            background = Design.ripple(Design.surface, dp(22).toFloat(), Design.line)
+            markAsButton()
+            contentDescription = "调高屏幕亮度，系统设置，约一分钟。查看任务"
+            setOnClickListener {
+                selectedTask = GuideTask.SCREEN_BRIGHTNESS
+                taskSuggestedByAi = false
+                showTask()
+            }
+        }
+        brightnessTask.addView(text("☀", 24f, Design.forest, true, Gravity.CENTER).apply {
+            background = Design.shape(Design.paleGreen, dp(18).toFloat())
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(58), dp(58)))
+        val brightnessCopy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), 0, 0, 0)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        brightnessCopy.addView(text("调高屏幕亮度", 22f, Design.ink, true))
+        space(brightnessCopy, 4)
+        brightnessCopy.addView(text("系统设置 · 约 1 分钟", 15f, Design.secondary))
+        brightnessTask.addView(brightnessCopy, LinearLayout.LayoutParams(0, -2, 1f))
+        brightnessTask.addView(text("›", 28f, Design.forest, gravity = Gravity.CENTER).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(28), dp(48)))
+        body.addView(brightnessTask)
         space(body, 18)
 
         val serviceRow = LinearLayout(this).apply {
@@ -261,21 +296,24 @@ class MainActivity : Activity() {
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
             .hideSoftInputFromWindow(input.windowToken, 0)
         input.clearFocus()
-        setInputStatus("正在查找已审核的任务…")
+        setInputStatus(GuideContent.intentSearching(preferences.textLanguage))
         intentClient.classify(goal, preferences.inputLanguage) { result ->
             if (screen != Screen.HOME || input.text.toString().trim() != goal) return@classify
             when (result?.decision) {
                 IntentClient.Decision.MATCH -> {
+                    selectedTask = GuideTask.fromId(result.taskId) ?: return@classify
                     taskSuggestedByAi = true
                     showTask()
                 }
-                IntentClient.Decision.CLARIFY -> setInputStatus("你是想把整个手机的字调大吗？请说得具体一点。")
-                IntentClient.Decision.UNSUPPORTED -> setInputStatus("暂时没有这项引导。现在可以选择“把字调大”。")
+                IntentClient.Decision.CLARIFY -> setInputStatus(GuideContent.intentClarify(preferences.textLanguage))
+                IntentClient.Decision.UNSUPPORTED -> setInputStatus(GuideContent.intentUnsupported(preferences.textLanguage))
                 null -> {
-                    if (TaskMatcher.matchesFontSize(goal)) {
+                    val fallback = TaskMatcher.match(goal)
+                    if (fallback != null) {
+                        selectedTask = fallback
                         taskSuggestedByAi = false
                         showTask()
-                    } else setInputStatus("AI 暂时不可用。请使用上方已审核的任务卡。")
+                    } else setInputStatus(GuideContent.intentUnavailable(preferences.textLanguage))
                 }
             }
         }
@@ -345,6 +383,7 @@ class MainActivity : Activity() {
 
     private fun showTask() {
         screen = Screen.TASK
+        val brightness = selectedTask == GuideTask.SCREEN_BRIGHTNESS
         window.statusBarColor = Design.background
         window.navigationBarColor = Design.background
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
@@ -368,10 +407,10 @@ class MainActivity : Activity() {
         space(body, 31)
         body.addView(text("系统设置  ·  约 1 分钟", 14f, Design.forest, true))
         space(body, 9)
-        body.addView(text("把字调大", 30f, Design.ink, true))
+        body.addView(text(if (brightness) "调高屏幕亮度" else "把字调大", 30f, Design.ink, true))
         space(body, 12)
         if (taskSuggestedByAi) {
-            body.addView(text("根据你的描述，找到这项已审核任务。请确认后再开始。", 15f, Design.forest, true))
+            body.addView(text(GuideContent.intentMatched(preferences.textLanguage), 15f, Design.forest, true))
             space(body, 10)
         }
         body.addView(text("接下来会打开手机设置。数字扶手只圈出下一步，点击和拖动都由你完成。", 17f, Design.secondary).apply {
@@ -393,9 +432,9 @@ class MainActivity : Activity() {
             row.addView(text(copy, 17f, Design.ink, true).apply { setPadding(dp(13), 0, 0, 0) })
             steps.addView(row)
         }
-        step("1", "找到 Display size and text")
+        step("1", if (brightness) "找到 Brightness level" else "找到 Display size and text")
         space(steps, 6)
-        step("2", "调整 Font size 滑块")
+        step("2", if (brightness) "调整屏幕亮度滑块" else "调整 Font size 滑块")
         body.addView(steps)
         space(body, 22)
         val scope = LinearLayout(this).apply {
@@ -421,7 +460,8 @@ class MainActivity : Activity() {
             setPadding(dp(22), dp(10), dp(22), dp(13))
             setBackgroundColor(Design.background)
         }
-        footer.addView(text("这会实际改变手机的字体大小", 14f, Design.secondary, gravity = Gravity.CENTER))
+        footer.addView(text(if (brightness) "这会实际改变手机的屏幕亮度" else "这会实际改变手机的字体大小",
+            14f, Design.secondary, gravity = Gravity.CENTER))
         space(footer, 10)
         footer.addView(action("打开系统设置，开始引导", Design.forest, Design.surface, 60) { startSettingsGuide() })
         root.addView(footer)
@@ -441,7 +481,7 @@ class MainActivity : Activity() {
         val body = page("语言设置")
         body.addView(text("按你的习惯来", 28f, Design.ink, true))
         space(body, 10)
-        body.addView(text("输入、屏幕文字、语音播报可以分别选择。换语言不会改变引导的操作步骤。", 17f, Design.secondary))
+        body.addView(text("输入、引导文字与 AI 提示、语音播报可以分别选择。换语言不会改变引导的操作步骤。", 17f, Design.secondary))
         space(body, 24)
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -450,7 +490,7 @@ class MainActivity : Activity() {
         }
         languageRow(card, "入", "你说 / 输入", { preferences.inputLanguage }) { preferences.inputLanguage = it }
         divider(card)
-        languageRow(card, "文", "屏幕文字", { preferences.textLanguage }) { preferences.textLanguage = it }
+        languageRow(card, "文", "引导文字 / AI 提示", { preferences.textLanguage }) { preferences.textLanguage = it }
         divider(card)
         languageRow(card, "声", "语音播报", { preferences.voiceLanguage }) { preferences.voiceLanguage = it }
         body.addView(card)
@@ -504,7 +544,28 @@ class MainActivity : Activity() {
             return
         }
         try {
-            preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", 1f)
+            if (selectedTask == GuideTask.SCREEN_BRIGHTNESS) {
+                val mode = Settings.System.getInt(contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE, -1)
+                if (mode != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL) {
+                    AlertDialog.Builder(this).setTitle("当前使用自动亮度")
+                        .setMessage("这项演示只验证了手动亮度模式。你仍可以自行调整亮度；数字扶手会停止圈画。")
+                        .setPositiveButton("知道了", null).show()
+                    return
+                }
+                preferences.initialBrightness = Settings.System.getInt(contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS, -1)
+                if (preferences.initialBrightness < 0) error("Brightness unavailable")
+                if (preferences.initialBrightness >= 250) {
+                    AlertDialog.Builder(this).setTitle("屏幕亮度已接近最高")
+                        .setMessage("现在无法再明显调高亮度。请先在系统设置中调低亮度，之后再开始这项引导。")
+                        .setPositiveButton("知道了", null).show()
+                    return
+                }
+            } else {
+                preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", 1f)
+            }
+            preferences.activeTask = selectedTask
             preferences.active = true
             preferences.collapsed = false
             startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))

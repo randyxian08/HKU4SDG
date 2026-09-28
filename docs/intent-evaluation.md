@@ -1,22 +1,22 @@
 # 数字扶手｜受约束 GenAI 意图识别验收
 
-飞书[产品定义](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)提出：AI 理解不同的任务表述，但流程审核、页面准入、圈画目标、私人步骤阻断和完成条件由确定性逻辑控制。现有真实可用任务只有 Android 15 / Pixel 7 英文设置中的 `font_size`（把系统字体调大）。**因此这轮模型测试只能证明“能识别支持与不支持的表达”，尚不能证明多任务选择能力。**第二个非敏感真实任务需要先审核和实测，再进入模型清单。
+飞书[产品定义](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)提出：AI 理解不同的任务表述，但流程审核、页面准入、圈画目标和完成条件由确定性逻辑控制。目前在 Android 15 / Pixel 7 英文系统设置模拟器中，`font_size`（把系统字体调大）与 `screen_brightness`（调高屏幕亮度）已有真实跨应用路径；模型只能在这两项之间选择、请求澄清或拒绝。
 
 ## 目前实现
 
 - 用户输入或经设备 ASR 转写后，在输入框内检查文字，再主动点箭头。App 只发送这段目标文字与已选输入语言；不会发送录音、无障碍树、截图或任意页面文字。明显含密码、验证码、支付、医疗、长数字或邮箱的描述先在本机拦下；这只是保守的第一道筛查，不能声称能识别所有敏感信息。
-- Debug 模拟器经宿主机回环代理调用方舟 Chat API 的 `doubao-seed-2-0-mini-260428`。模型只能给出 `match`、`clarify`、`unsupported`，且 `match` 必须对应 `font_size`。本机再校验字段、任务 ID 与状态组合，不接受新任务、坐标或模型编造的步骤。用户仍要在任务确认页确认，并亲手完成操作。
-- 模型不可用时，只对少数明确的放大字体表达使用保守的本地匹配；其余回到任务卡。模型回复、异常及原始输入默认不持久化。代理还会对明显敏感描述再做一次阻断；每次启动最多 60 次意图请求、每条最多 160 字。
+- Debug 模拟器经宿主机回环代理调用方舟 Chat API 的 `doubao-seed-2-0-mini-260428`。模型只能给出 `match`、`clarify`、`unsupported`，且 `match` 必须对应 `font_size` 或 `screen_brightness`。本机再校验字段、任务 ID 与状态组合，不接受新任务、坐标或模型编造的步骤。用户仍要在任务确认页确认，并亲手完成操作。
+- 模型不可用时，只对少数明确的放大字体或调高亮度表达使用保守的本地匹配；其余回到任务卡。模型回复、异常及原始输入默认不持久化。代理还会对明显敏感描述再做一次阻断；每次启动最多 60 次意图请求、每条最多 160 字。
 - Default 项目的 `Doubao-Seed-2.0-mini` 已单独开通，开发密钥仅允许访问该模型。2026-09-28 的真实模型对照和 Android 模拟器三种结果路径已验证；密钥只保存在本机被 Git 忽略的 `.env` 中。服务停止、网络超时或额度用尽时仍需走本地退路。
 
 ## 固定对照与继续条件
 
-[`scripts/intent_cases.json`](../scripts/intent_cases.json)包含 18 条虚构、无个人资料的普通话／粤语／英语测试句：6 条明确支持、3 条应澄清、9 条范围外或对抗表达。`python3 scripts/evaluate_intent.py` 只运行本地退路；配置独立 `ARK_API_KEY` 后用 `python3 scripts/evaluate_intent.py --live` 调真实模型。两者在**同一批文本**上比较准确决策、错误匹配、支持任务召回与延迟，并保留逐条失败案例。
+[`scripts/intent_cases.json`](../scripts/intent_cases.json)包含 28 条虚构、无个人资料的普通话／粤语／英语测试句：13 条明确支持、3 条应澄清、12 条范围外或对抗表达。正确结果必须同时匹配决策和任务 ID，不能只看是否返回 `match`。`python3 scripts/evaluate_intent.py` 只运行本地退路；配置独立 `ARK_API_KEY` 后用 `python3 scripts/evaluate_intent.py --live` 调真实模型。两者在**同一批文本**上比较准确决策、错误匹配、支持任务召回与延迟，并保留逐条失败案例。
 
-2026-09-28 同一批 18 条样本：本地退路 12/18 完全一致，支持任务 3/6，范围外请求错误匹配 0；方舟真实模型 18/18 完全一致，支持任务 6/6，范围外请求错误匹配 0，单次响应中位数 1.7 秒。模型把 3 条模糊句识别为应澄清；本地退路不能澄清，因而拒绝。这只是团队编写的小型合成集，不代表真实长者表达或统计意义上的准确率。逐条 JSON 输出保存在本机被 Git 忽略的 `captures/intent-eval-live.json`，可用上述命令复现。
+2026-09-28 同一批 28 条样本：本地退路 18/28 完全一致，支持任务 6/13，范围外请求错误匹配 0；方舟真实模型 28/28 完全一致，支持任务 13/13，范围外请求错误匹配 0，单次响应中位数 1.63 秒。模型把 3 条模糊句识别为应澄清；本地退路不能澄清，因而拒绝。这只是团队编写的小型合成集，不代表真实长者表达或统计意义上的准确率。逐条 JSON 输出保存在本机被 Git 忽略的 `captures/intent-eval-two-tasks.json`，可用上述命令复现。
 
-在 Android 15 / Pixel 7 模拟器上，英文明确请求 `Make the system text larger` 经真实模型进入[已审核任务确认页](screenshots/android15-ai-intent-match.png)；模糊请求 `Can you make the screen easier to read` [显示澄清](screenshots/android15-ai-intent-clarify.png)；范围外请求 `Send a text message` [显示暂不支持](screenshots/android15-ai-intent-unsupported.png)。这验证了输入到回复/任务页的演示链路，**没有**验证真实老人的理解程度、模型遇到所有隐私描述时的安全性，或未审核的跨应用任务。
+在 Android 15 / Pixel 7 模拟器上，英文请求 `Make the system text larger` 经真实模型进入[字体任务确认页](screenshots/android15-ai-intent-match.png)；`Make the screen brighter` 进入[亮度任务确认页](screenshots/android15-brightness-ai-match.png)，然后由用户在真实设置里完成[圈画与亮度调节](interface.md)。模糊请求 `Can you make the screen easier to read` [显示澄清](screenshots/android15-ai-intent-clarify.png)；范围外请求 `Send a text message` [显示暂不支持](screenshots/android15-ai-intent-unsupported.png)。这验证了输入到回复/任务页的演示链路，**没有**验证真实老人的理解程度、模型遇到所有隐私描述时的安全性，或未审核的跨应用任务。
 
-下一次扩大样本时，范围外请求仍应**错误匹配为 0**；若出现错误，先收紧允许范围并重测。还需用不含个人资料的真实表达进行盲测，记录网络错误、慢响应和各语言的样本分母。模型分类价值受“只有一项任务”限制；下一阶段应优先审核第二个实际系统任务，再比较规则与模型是否仍有差异。结构化输出是接口约束，不能代替本机结果验证或用户确认。
+下一次扩大样本时，范围外请求仍应**错误匹配为 0**；若出现错误，先收紧允许范围并重测。还需用不含个人资料的真实表达进行盲测，记录网络错误、慢响应和各语言的样本分母。结构化输出是接口约束，不能代替本机结果验证或用户确认。两个任务都只能覆盖已测模拟器路径；亮度处于最大值、自动亮度开启及其他系统皮肤还未验收。
 
 方舟模型列表与 JSON Schema 支持：[官方模型列表](https://docs.volcengine.com/docs/ark/model-list?lang=zh)、[Chat API](https://docs.volcengine.com/docs/ark/chat-api?lang=zh)。开通时控制台显示该模型剩余 500,000 / 500,000 免费推理 token；额度耗尽后可能按量计费，需继续看控制台用量。语音合成 2.0 的密钥与方舟模型密钥是两个独立凭证。

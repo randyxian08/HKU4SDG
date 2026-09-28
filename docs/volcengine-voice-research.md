@@ -24,7 +24,7 @@
 |---|---|---|
 | 普通话、粤语、英语语音输入 | [流式识别 2.0 选型](https://docs.volcengine.com/docs/DoubaoVoice/Accessmust-read_1?lang=zh)区分一句话识别 `bigmodel_nostream` 与实时识别 `bigmodel_async`；[单向 WebSocket API](https://docs.volcengine.com/docs/DoubaoVoice/unidirectional-streaming-automatic-speech-recognition-websocket?lang=zh)列出 `zh-CN`、`yue-CN`、`en-US`。 | MVP 是按住/点击说一句任务，优先试稳定的 `bigmodel_nostream`；结果先让用户看见和修改，再交给任务匹配。现有 App 内粤语标签为 `yue-HK`，接火山接口需明确映射到 `yue-CN`，不能直接传过去。 |
 | 三语播报 | [TTS HTTP API](https://docs.volcengine.com/docs/DoubaoVoice/unidirectional-streaming-text-to-speech-http?lang=zh)有语种参数及 `explicit_dialect=yue`；使用粤语参数须选择支持方言的音色。 | TTS 2.0 / Vivi 2.0 的三语真实 API 调用已分别得到可解码 MP3；模拟器中的粤语引导也已打通云播报链路。仍须真人审听，并与 TTS 1.0 的“粤语小溏”比较。播报只读已审核文案；失败时保留可折叠文字卡。 |
-| 自然语言理解 | [方舟 Chat API](https://docs.volcengine.com/docs/ark/chat-api?lang=zh)支持部分模型的结构化 `json_schema` 响应，官方标明该能力存在 beta 限制。 | Default 项目的 Mini 模型已单独开通；Debug 代理输出仅限 `font_size`、`clarify`、`unsupported` 并在本机再次校验。[18 条三语测试集](intent-evaluation.md)中真实模型 18/18、本地退路 12/18；模拟器明确、模糊、范围外三条路径已走通。 |
+| 自然语言理解 | [方舟 Chat API](https://docs.volcengine.com/docs/ark/chat-api?lang=zh)支持部分模型的结构化 `json_schema` 响应，官方标明该能力存在 beta 限制。 | Default 项目的 Mini 模型已单独开通；Debug 代理输出仅限 `font_size`、`screen_brightness`、`clarify`、`unsupported` 并在本机再次校验。[28 条三语测试集](intent-evaluation.md)中真实模型 28/28、本地退路 18/28；模拟器两个任务及模糊、范围外路径已走通。 |
 
 不在第一轮接入端到端实时语音对话：当前产品需要独立控制输入、文字与播报语言，还需要用户确认及固定步骤。模块化管线更容易逐项验证错误和保留文字退路。这个顺序是团队的产品判断，不是官方对各模型效果的承诺。
 

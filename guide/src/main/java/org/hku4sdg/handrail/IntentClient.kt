@@ -73,7 +73,8 @@ class IntentClient(context: Context) {
                 else -> error("Unknown intent decision")
             }
             val taskId = response.getString("task_id")
-            if ((decision == Decision.MATCH) != (taskId == "font_size")) error("Unapproved task")
+            if ((decision == Decision.MATCH) != (GuideTask.fromId(taskId) != null))
+                error("Unapproved task")
             return Result(decision, taskId)
         } finally {
             connection.disconnect()

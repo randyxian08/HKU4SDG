@@ -43,13 +43,14 @@ class GuideAccessibilityService : AccessibilityService() {
             cloudTts?.stop()
             return
         }
-        if (event?.packageName?.toString() != SETTINGS_PACKAGE) {
-            // Only the registered Settings package can be inspected.
-            if (rootInActiveWindow?.packageName?.toString() != SETTINGS_PACKAGE) {
+        val allowed = allowedPackages()
+        if (event?.packageName?.toString() !in allowed) {
+            if (rootInActiveWindow?.packageName?.toString() !in allowed) {
                 overlay.clear()
                 tts?.stop()
                 cloudTts?.stop()
                 renderKey = null
+                shownStep = null
             }
             return
         }
@@ -91,16 +92,12 @@ class GuideAccessibilityService : AccessibilityService() {
         return current
     }
 
-    private fun render(force: Boolean = false) {
-        val root = rootInActiveWindow
-        if (root?.packageName?.toString() != SETTINGS_PACKAGE) {
-            overlay.clear()
-            tts?.stop()
-            cloudTts?.stop()
-            return
-        }
-        // Strictly match this tested English Android 15 Settings layout. Unknown layouts stop.
-        val target = when {
+    private fun allowedPackages(): Set<String> = if (preferences.activeTask == GuideTask.SCREEN_BRIGHTNESS)
+        setOf(SETTINGS_PACKAGE, SYSTEMUI_PACKAGE) else setOf(SETTINGS_PACKAGE)
+
+    private fun fontTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        if (root.packageName?.toString() != SETTINGS_PACKAGE) return null
+        return when {
             header(root, "Display size and text") -> {
                 val current = Settings.System.getFloat(contentResolver, FONT_SCALE_KEY, 1f)
                 if (current > preferences.initialFontScale + 0.01f) GuideStep.COMPLETE to null
@@ -115,10 +112,59 @@ class GuideAccessibilityService : AccessibilityService() {
                     it.text?.toString() == "Display size and text" }?.let(::clickableAncestor)
             else -> null
         }
-        if (target == null || (target.first != GuideStep.COMPLETE && target.second == null)) {
+    }
+
+    private fun brightnessTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        val initial = preferences.initialBrightness
+        val current = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1)
+        if (initial < 0 || current < 0) return null
+        return when (root.packageName?.toString()) {
+            SETTINGS_PACKAGE -> {
+                if (!header(root, "Display & touch")) return null
+                val row = findNode(root) { it.viewIdResourceName == "android:id/title" &&
+                    it.text?.toString() == "Brightness level" }?.let(::clickableAncestor) ?: return null
+                if (current > initial + 5) GuideStep.BRIGHTNESS_COMPLETE to null
+                else GuideStep.BRIGHTNESS_ROW to row
+            }
+            SYSTEMUI_PACKAGE -> {
+                if (shownStep !in setOf(GuideStep.BRIGHTNESS_ROW, GuideStep.BRIGHTNESS_SLIDER,
+                        GuideStep.BRIGHTNESS_COMPLETE)) return null
+                // The dialog briefly hides its slider while a drag settles. Keep the verified
+                // brightness path and read the actual setting before requiring a visible target.
+                if (current > initial + 5 && shownStep == GuideStep.BRIGHTNESS_SLIDER) {
+                    return GuideStep.BRIGHTNESS_COMPLETE to null
+                }
+                val slider = findNode(root) {
+                    it.className?.toString() == "android.widget.SeekBar" &&
+                        it.viewIdResourceName == "$SYSTEMUI_PACKAGE:id/slider" &&
+                        it.text?.toString() == "Display brightness"
+                }
+                if (slider == null) return null
+                if (current > initial + 5) GuideStep.BRIGHTNESS_COMPLETE to null
+                else GuideStep.BRIGHTNESS_SLIDER to slider
+            }
+            else -> null
+        }
+    }
+
+    private fun render(force: Boolean = false) {
+        val root = rootInActiveWindow
+        if (root?.packageName?.toString() !in allowedPackages()) {
+            overlay.clear()
             tts?.stop()
             cloudTts?.stop()
             shownStep = null
+            return
+        }
+        // Strictly match the tested English Android 15 Settings and brightness dialog layouts.
+        val target = when (preferences.activeTask) {
+            GuideTask.FONT_SIZE -> fontTarget(root)
+            GuideTask.SCREEN_BRIGHTNESS -> brightnessTarget(root)
+        }
+        if (target == null || (!target.first.isComplete && target.second == null)) {
+            tts?.stop()
+            cloudTts?.stop()
+            if (root.packageName?.toString() != SYSTEMUI_PACKAGE) shownStep = null
             renderKey = null
             overlay.showStatus(GuideContent.unknown(preferences.textLanguage), false,
                 onResume = {}, onExit = ::endGuide)
@@ -126,7 +172,7 @@ class GuideAccessibilityService : AccessibilityService() {
         }
         val (step, node) = target
         val bounds = node?.let { Rect().also(it::getBoundsInScreen) }
-        val key = "$step:$bounds:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}"
+        val key = "${preferences.activeTask}:$step:$bounds:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}"
         if (!force && key == renderKey) return
         val changedStep = shownStep != step
         shownStep = step
@@ -146,7 +192,7 @@ class GuideAccessibilityService : AccessibilityService() {
             onMute = { preferences.muted = !preferences.muted; if (preferences.muted) { tts?.stop(); cloudTts?.stop() }; render(true) },
             onExit = ::endGuide
         )
-        if (changedStep && step != GuideStep.COMPLETE) speak(step)
+        if (changedStep && !step.isComplete) speak(step)
     }
 
     private fun next(current: GuideLanguage): GuideLanguage =
@@ -184,6 +230,7 @@ class GuideAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val SETTINGS_PACKAGE = "com.android.settings"
+        private const val SYSTEMUI_PACKAGE = "com.android.systemui"
         private const val FONT_SCALE_KEY = "font_scale"
     }
 }
@@ -212,7 +259,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
         clear()
         if (bounds != null) addRing(bounds, step)
         val root = cardBase()
-        if (step == GuideStep.COMPLETE) {
+        if (step.isComplete) {
             root.addView(label("●  已完成", 14f, Design.forest, true))
             space(root, 14)
             root.addView(label(message, 21f, Design.ink, true).apply { setLineSpacing(dp(4).toFloat(), 1f) })
@@ -222,7 +269,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
             addCard(root, null)
             return
         }
-        val number = "第 ${step.ordinal + 1} / 2 步"
+        val number = "第 ${step.number} / 2 步"
         val eyebrow = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
         eyebrow.addView(label("●  正在引导  ·  $number", 13f, Design.forest, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -334,9 +381,9 @@ private class GuideOverlay(private val service: AccessibilityService) {
                 val bottom = (height - padding).toFloat()
                 canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), fill)
                 canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), stroke)
-                if (step != GuideStep.COMPLETE) {
+                if (!step.isComplete) {
                     canvas.drawCircle(left, top, dp(14).toFloat(), badge)
-                    canvas.drawText((step.ordinal + 1).toString(), left, top - (badgeText.ascent() + badgeText.descent()) / 2, badgeText)
+                    canvas.drawText(step.number.toString(), left, top - (badgeText.ascent() + badgeText.descent()) / 2, badgeText)
                 }
             }
         }

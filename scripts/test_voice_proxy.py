@@ -64,7 +64,7 @@ class VoiceProxyTest(unittest.TestCase):
         self.assertEqual(sent["model"], voice_proxy.ARK_MODEL)
         self.assertEqual(sent["messages"][1]["content"], "Input language: cantonese\nUser goal: 啲字太细")
         self.assertEqual(sent["response_format"]["type"], "json_schema")
-        self.assertNotIn("screen", json.dumps(sent).lower())
+        self.assertNotIn("screen", sent["messages"][1]["content"].lower())
 
     def test_intent_rejects_model_created_task_or_incomplete_response(self):
         for content, finish in [
@@ -77,6 +77,14 @@ class VoiceProxyTest(unittest.TestCase):
                     voice_proxy.urllib.request, "urlopen", return_value=io.BytesIO(json.dumps(answer).encode())):
                 with self.assertRaises(RuntimeError):
                     voice_proxy.classify_intent("hello", "english", "test-ark-key")
+
+    def test_intent_accepts_only_reviewed_brightness_task(self):
+        answer = {"choices": [{"finish_reason": "stop", "message": {
+            "content": '{"decision":"match","task_id":"screen_brightness"}'}}]}
+        with patch.object(voice_proxy.urllib.request, "urlopen",
+                          return_value=io.BytesIO(json.dumps(answer).encode())):
+            self.assertEqual(voice_proxy.classify_intent("Make the screen brighter", "english", "test-ark-key"),
+                             {"decision": "match", "task_id": "screen_brightness"})
 
     def test_intent_endpoint_fails_closed_without_ark_key(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), voice_proxy.VoiceHandler)
