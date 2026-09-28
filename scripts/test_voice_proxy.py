@@ -17,6 +17,7 @@ class VoiceProxyTest(unittest.TestCase):
             return io.BytesIO(b"\n".join([
                 json.dumps({"code": 0, "data": base64.b64encode(b"first").decode()}).encode(),
                 json.dumps({"code": 0, "data": base64.b64encode(b"second").decode()}).encode(),
+                json.dumps({"code": 20000000, "message": "OK", "data": None}).encode(),
             ]))
 
         with patch.object(voice_proxy.urllib.request, "urlopen", side_effect=fake_open):
@@ -24,6 +25,14 @@ class VoiceProxyTest(unittest.TestCase):
         sent = json.loads(captured["request"].data)
         self.assertEqual(json.loads(sent["req_params"]["additions"])["explicit_dialect"], "yue")
         self.assertEqual(captured["request"].get_header("X-api-key"), "test-key")
+
+    def test_incomplete_audio_stream_is_rejected(self):
+        def fake_open(request, timeout):
+            return io.BytesIO(json.dumps({"code": 0, "data": base64.b64encode(b"partial").decode()}).encode())
+
+        with patch.object(voice_proxy.urllib.request, "urlopen", side_effect=fake_open):
+            with self.assertRaisesRegex(RuntimeError, "did not complete"):
+                voice_proxy.synthesize("hello", "english", "test-key")
 
     def test_missing_key_and_invalid_language_do_not_call_provider(self):
         with patch.object(voice_proxy.urllib.request, "urlopen") as request:

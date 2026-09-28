@@ -28,9 +28,9 @@ source scripts/dev-env.sh
 
 ## 开发版在线播报
 
-Android 15 模拟器上的 Debug APK 会尝试连接宿主机 `127.0.0.1:8765` 的本地语音代理（模拟器内地址为 `10.0.2.2`）。代理使用火山引擎 TTS 2.0 / Vivi 2.0；普通话、英语和粤语分别配置语种或粤语模式。服务密钥只在宿主机进程中使用，不放进 APK 或 Git。正式服务与体验中心是两套开通状态；若未开通正式 API，或代理未运行，App 会退回设备 TTS，文字卡照常保留。
+Android 15 模拟器上的 Debug APK 会尝试连接宿主机 `127.0.0.1:8765` 的本地语音代理（模拟器内地址为 `10.0.2.2`）。代理使用已开通的火山引擎 TTS 2.0 / Vivi 2.0；普通话、英语和粤语分别配置语种或粤语模式。服务密钥只在宿主机进程中使用，不放进 APK 或 Git。若代理未运行或接口失败，App 会退回设备 TTS，文字卡照常保留。
 
-本机启动方式：复制 `.env.example` 为被 Git 忽略的 `.env`，只在本机填入 `VOLCENGINE_API_KEY`，然后运行 `set -a; source .env; set +a; python3 scripts/voice_proxy.py`。检查 `curl http://127.0.0.1:8765/health` 是否返回 `{"ready": true}`。只有用户主动点击“再听一遍”或进入已审核步骤时，固定引导文字才会送到火山接口；用户说的话仍由 Android 系统语音识别处理。代理只监听宿主机回环地址，Debug 构建才允许本地 HTTP；正式构建不连接这个代理。
+本机启动方式：复制 `.env.example` 为被 Git 忽略的 `.env`，只在本机填入 `VOLCENGINE_API_KEY`，然后运行 `set -a; source .env; set +a; SSL_CERT_FILE=/etc/ssl/cert.pem python3 scripts/voice_proxy.py`。本机 Homebrew Python 需要指定系统证书库；其他环境若默认 HTTPS 验证正常，可省略 `SSL_CERT_FILE`。检查 `curl http://127.0.0.1:8765/health` 是否返回 `{"ready": true}`。只有用户主动点击“再听一遍”或进入已审核步骤时，固定引导文字才会送到火山接口；用户说的话仍由 Android 系统语音识别处理。代理只监听宿主机回环地址，Debug 构建才允许本地 HTTP；正式构建不连接这个代理。
 代理每次启动最多处理 100 次、合计 5,000 字符的演示请求，达到上限即拒绝并由 App 回退到本机播报。这个本机上限不替代控制台的实际免费额度和账单检查。
 
 ## 一起协作

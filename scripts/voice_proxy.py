@@ -42,11 +42,15 @@ def synthesize(text: str, language: str, api_key: str) -> bytes:
     }, method="POST")
     chunks = []
     total = 0
+    completed = False
     with urllib.request.urlopen(request, timeout=20) as response:
         for line in response:
             if not line.strip():
                 continue
             event = json.loads(line)
+            if event.get("code") == 20000000:
+                completed = True
+                break
             if event.get("code") != 0:
                 raise RuntimeError("Volcano TTS returned a nonzero code")
             encoded = event.get("data")
@@ -56,8 +60,8 @@ def synthesize(text: str, language: str, api_key: str) -> bytes:
                 if total > MAX_AUDIO_BYTES:
                     raise RuntimeError("Voice response exceeded the demo limit")
                 chunks.append(chunk)
-    if not chunks:
-        raise RuntimeError("Volcano TTS returned no audio")
+    if not completed or not chunks:
+        raise RuntimeError("Volcano TTS did not complete with audio")
     return b"".join(chunks)
 
 
