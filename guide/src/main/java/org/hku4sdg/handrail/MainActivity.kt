@@ -111,7 +111,7 @@ class MainActivity : Activity() {
 
         val section = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         section.addView(text("可用引导", 18f, Design.ink, true), LinearLayout.LayoutParams(0, -2, 1f))
-        section.addView(text("3 项", 14f, Design.secondary))
+        section.addView(text("4 项", 14f, Design.secondary))
         body.addView(section)
         space(body, 14)
 
@@ -203,6 +203,37 @@ class MainActivity : Activity() {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }, LinearLayout.LayoutParams(dp(28), dp(48)))
         body.addView(chromeTask)
+        space(body, 12)
+        val mapsTask = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(17), dp(18), dp(16), dp(18))
+            background = Design.ripple(Design.surface, dp(22).toFloat(), Design.line)
+            markAsButton()
+            contentDescription = "查看香港中央图书馆地址，在 Google Maps 操作，约一分钟。查看任务"
+            setOnClickListener {
+                selectedTask = GuideTask.MAPS_LIBRARY_ADDRESS
+                taskSuggestedByAi = false
+                showTask()
+            }
+        }
+        mapsTask.addView(text("⌖", 26f, Design.forest, true, Gravity.CENTER).apply {
+            background = Design.shape(Design.paleGreen, dp(18).toFloat())
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(58), dp(58)))
+        val mapsCopy = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), 0, 0, 0)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        mapsCopy.addView(text("查看中央图书馆地址", 21f, Design.ink, true))
+        space(mapsCopy, 4)
+        mapsCopy.addView(text("Google Maps · 约 1 分钟", 15f, Design.secondary))
+        mapsTask.addView(mapsCopy, LinearLayout.LayoutParams(0, -2, 1f))
+        mapsTask.addView(text("›", 28f, Design.forest, gravity = Gravity.CENTER).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(28), dp(48)))
+        body.addView(mapsTask)
         space(body, 18)
 
         val serviceRow = LinearLayout(this).apply {
@@ -421,6 +452,7 @@ class MainActivity : Activity() {
         screen = Screen.TASK
         val brightness = selectedTask == GuideTask.SCREEN_BRIGHTNESS
         val chrome = selectedTask == GuideTask.CHROME_BOOKMARK
+        val maps = selectedTask == GuideTask.MAPS_LIBRARY_ADDRESS
         window.statusBarColor = Design.background
         window.navigationBarColor = Design.background
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
@@ -442,10 +474,15 @@ class MainActivity : Activity() {
         topBar.addView(text("任务确认", 17f, Design.ink, true).apply { setPadding(dp(7), 0, 0, 0) })
         body.addView(topBar)
         space(body, 31)
-        body.addView(text(if (chrome) "Chrome  ·  约 1 分钟" else "系统设置  ·  约 1 分钟", 14f, Design.forest, true))
+        body.addView(text(when {
+            chrome -> "Chrome  ·  约 1 分钟"
+            maps -> "Google Maps  ·  约 1 分钟"
+            else -> "系统设置  ·  约 1 分钟"
+        }, 14f, Design.forest, true))
         space(body, 9)
         body.addView(text(when {
             chrome -> "收藏长者服务网页"
+            maps -> "查看中央图书馆地址"
             brightness -> "调高屏幕亮度"
             else -> "把字调大"
         }, 30f, Design.ink, true))
@@ -454,9 +491,11 @@ class MainActivity : Activity() {
             body.addView(text(GuideContent.intentMatched(preferences.textLanguage), 15f, Design.forest, true))
             space(body, 10)
         }
-        body.addView(text(if (chrome)
-            "接下来会在 Chrome 打开香港政府一站通的公开长者服务网页。数字扶手只圈出下一步，收藏由你亲手完成。"
-            else "接下来会打开手机设置。数字扶手只圈出下一步，点击和拖动都由你完成。",
+        body.addView(text(when {
+            chrome -> "接下来会在 Chrome 打开香港政府一站通的公开长者服务网页。数字扶手只圈出下一步，收藏由你亲手完成。"
+            maps -> "接下来会在 Google Maps 打开香港中央图书馆的地点卡。你亲手打开详情，数字扶手只指出地址在哪一行；数字扶手不会请求你的位置。"
+            else -> "接下来会打开手机设置。数字扶手只圈出下一步，点击和拖动都由你完成。"
+        },
             17f, Design.secondary).apply {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
@@ -478,12 +517,14 @@ class MainActivity : Activity() {
         }
         step("1", when {
             chrome -> "打开 Chrome 右上角菜单"
+            maps -> "点开图书馆地点详情"
             brightness -> "找到 Brightness level"
             else -> "找到 Display size and text"
         })
         space(steps, 6)
         step("2", when {
             chrome -> "点 Bookmark 星标收藏"
+            maps -> "查看地址行"
             brightness -> "调整屏幕亮度滑块"
             else -> "调整 Font size 滑块"
         })
@@ -500,9 +541,11 @@ class MainActivity : Activity() {
         }
         scope.addView(text("已验证的设备", 14f, Design.forest, true))
         space(scope, 6)
-        scope.addView(text(if (chrome)
-            "Android 15 / Pixel 7 模拟器，Chrome 124 和政府一站通公开网页。浏览器或网页改变时会停止圈画；这不是政府合作服务。"
-            else "Android 15 / Pixel 7 模拟器，英文系统设置。其他手机的页面不同；认不出时会停下。",
+        scope.addView(text(when {
+            chrome -> "Android 15 / Pixel 7 模拟器，Chrome 124 和政府一站通公开网页。浏览器或网页改变时会停止圈画；这不是政府合作服务。"
+            maps -> "Android 15 / Pixel 7 模拟器，Google Maps 11.129 和香港中央图书馆地点卡。地址信息来自地图，出行前可再向图书馆核对；这不是 Google 或图书馆合作服务。"
+            else -> "Android 15 / Pixel 7 模拟器，英文系统设置。其他手机的页面不同；认不出时会停下。"
+        },
             15f, Design.ink).apply {
             setLineSpacing(dp(3).toFloat(), 1f)
         })
@@ -521,12 +564,17 @@ class MainActivity : Activity() {
         }
         footer.addView(text(when {
             chrome -> "这会在 Chrome 保存一个公开网页书签"
+            maps -> "这只会打开公开地点信息，不会发送消息或导航"
             brightness -> "这会实际改变手机的屏幕亮度"
             else -> "这会实际改变手机的字体大小"
         },
             14f, Design.secondary, gravity = Gravity.CENTER))
         space(footer, 10)
-        footer.addView(action(if (chrome) "打开 Chrome，开始引导" else "打开系统设置，开始引导",
+        footer.addView(action(when {
+            chrome -> "打开 Chrome，开始引导"
+            maps -> "打开地图，开始引导"
+            else -> "打开系统设置，开始引导"
+        },
             Design.forest, Design.surface, 60) { startGuide() })
         root.addView(footer)
         root.setOnApplyWindowInsetsListener { _, insets ->
@@ -559,7 +607,7 @@ class MainActivity : Activity() {
         languageRow(card, "声", "语音播报", { preferences.voiceLanguage }) { preferences.voiceLanguage = it }
         body.addView(card)
         space(body, 20)
-        body.addView(text("语音识别由设备提供。播报可能将固定引导文字交给云端语音服务；连接失败时使用设备播报。文字和任务卡始终可用。", 15f, Design.secondary))
+        body.addView(text("开发版模拟器中，你主动录制的语音经本机代理交给火山引擎识别；其他版本使用设备识别。播报可能把固定引导文字交给云端服务。文字和任务卡始终可用。", 15f, Design.secondary))
     }
 
     private fun page(title: String): LinearLayout {
@@ -637,6 +685,10 @@ class MainActivity : Activity() {
                 startActivity(Intent(Intent.ACTION_VIEW,
                     Uri.parse("https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm"))
                     .setPackage("com.android.chrome"))
+            } else if (selectedTask == GuideTask.MAPS_LIBRARY_ADDRESS) {
+                startActivity(Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://www.google.com/maps/search/?api=1&query=Hong%20Kong%20Central%20Library"))
+                    .setPackage("com.google.android.apps.maps"))
             } else startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
         } catch (_: Exception) {
             preferences.active = false

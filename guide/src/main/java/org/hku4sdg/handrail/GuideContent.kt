@@ -17,7 +17,7 @@ enum class GuideLanguage(val label: String, val tag: String) {
 
 enum class GuideTask(val id: String) {
     FONT_SIZE("font_size"), SCREEN_BRIGHTNESS("screen_brightness"),
-    CHROME_BOOKMARK("chrome_bookmark");
+    CHROME_BOOKMARK("chrome_bookmark"), MAPS_LIBRARY_ADDRESS("maps_library_address");
 
     companion object {
         fun fromId(id: String) = entries.firstOrNull { it.id == id }
@@ -34,9 +34,12 @@ enum class GuideStep(val task: GuideTask, val number: Int) {
     CHROME_MENU(GuideTask.CHROME_BOOKMARK, 1),
     CHROME_SAVE(GuideTask.CHROME_BOOKMARK, 2),
     CHROME_VERIFY(GuideTask.CHROME_BOOKMARK, 3),
-    CHROME_COMPLETE(GuideTask.CHROME_BOOKMARK, 3);
+    CHROME_COMPLETE(GuideTask.CHROME_BOOKMARK, 3),
+    MAPS_PLACE(GuideTask.MAPS_LIBRARY_ADDRESS, 1),
+    MAPS_ADDRESS(GuideTask.MAPS_LIBRARY_ADDRESS, 2);
 
-    val isComplete get() = this == COMPLETE || this == BRIGHTNESS_COMPLETE || this == CHROME_COMPLETE
+    val isComplete get() = this == COMPLETE || this == BRIGHTNESS_COMPLETE ||
+        this == CHROME_COMPLETE || this == MAPS_ADDRESS
 }
 
 /** Fixed copy for the reviewed Android 15 / Pixel 7 emulator flow. Native-speaker review is pending. */
@@ -48,9 +51,9 @@ object GuideContent {
     }
 
     fun intentClarify(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "你想调大手机的字、调亮屏幕，还是收藏长者服务网页？请说得具体一点。"
-        GuideLanguage.CANTONESE -> "你系想调大手机啲字、调光啲个屏幕，定系收藏长者服务网页？请讲清楚啲。"
-        GuideLanguage.ENGLISH -> "Do you want larger text, a brighter screen, or to bookmark the elderly services page? Please be more specific."
+        GuideLanguage.MANDARIN -> "你想调大手机的字、调亮屏幕、收藏长者服务网页，还是查看中央图书馆地址？请说得具体一点。"
+        GuideLanguage.CANTONESE -> "你系想调大手机啲字、调光啲个屏幕、收藏长者服务网页，定系睇中央图书馆地址？请讲清楚啲。"
+        GuideLanguage.ENGLISH -> "Do you want larger text, a brighter screen, the elderly-services bookmark, or the Central Library address? Please be more specific."
     }
 
     fun intentUnsupported(language: GuideLanguage) = when (language) {
@@ -83,6 +86,8 @@ object GuideContent {
             GuideStep.CHROME_SAVE -> "请点圈住的“Bookmark”星标，收藏这个公开网页。"
             GuideStep.CHROME_VERIFY -> "请再次打开圈住的菜单，检查书签是否已保存。"
             GuideStep.CHROME_COMPLETE -> "已确认 Chrome 显示“Edit bookmark”，这个网页已收藏。"
+            GuideStep.MAPS_PLACE -> "请点圈住的“Hong Kong Central Library”地点卡，展开详情。"
+            GuideStep.MAPS_ADDRESS -> "地图已显示香港中央图书馆的地址。请看圈住的地址行；出行前也可向图书馆核对。"
         }
         GuideLanguage.CANTONESE -> when (step) {
             GuideStep.DISPLAY_SIZE -> "请㩒圈住嘅「Display size and text」。"
@@ -95,6 +100,8 @@ object GuideContent {
             GuideStep.CHROME_SAVE -> "请㩒圈住嘅「Bookmark」星號，收藏呢個公開網頁。"
             GuideStep.CHROME_VERIFY -> "请再打开圈住嘅選單，检查書籤係咪已儲存。"
             GuideStep.CHROME_COMPLETE -> "已確認 Chrome 顯示「Edit bookmark」，呢個網頁已收藏。"
+            GuideStep.MAPS_PLACE -> "请㩒圈住嘅「Hong Kong Central Library」地点卡，打开详情。"
+            GuideStep.MAPS_ADDRESS -> "地图已经显示香港中央图书馆嘅地址。请睇圈住嘅地址；出发前亦可以向图书馆核对。"
         }
         GuideLanguage.ENGLISH -> when (step) {
             GuideStep.DISPLAY_SIZE -> "Tap the circled “Display size and text” row."
@@ -107,6 +114,8 @@ object GuideContent {
             GuideStep.CHROME_SAVE -> "Tap the circled Bookmark star to save this public page."
             GuideStep.CHROME_VERIFY -> "Open the circled menu again to check that the bookmark was saved."
             GuideStep.CHROME_COMPLETE -> "Chrome now shows “Edit bookmark”, confirming this page was saved."
+            GuideStep.MAPS_PLACE -> "Tap the circled Hong Kong Central Library place card to open its details."
+            GuideStep.MAPS_ADDRESS -> "Maps now shows the library address. Read the circled address and confirm it with the library before travelling if needed."
         }
     }
 
@@ -172,6 +181,7 @@ object TaskMatcher {
         matchesFontSize(input) -> GuideTask.FONT_SIZE
         matchesBrightness(input) -> GuideTask.SCREEN_BRIGHTNESS
         matchesChromeBookmark(input) -> GuideTask.CHROME_BOOKMARK
+        matchesMapsLibraryAddress(input) -> GuideTask.MAPS_LIBRARY_ADDRESS
         else -> null
     }
 
@@ -202,6 +212,16 @@ object TaskMatcher {
         val page = listOf("长者服务", "長者服務", "老人服务", "elderly services",
             "elderly service page").any { it in text }
         return save && source && page && !SensitiveGoalGuard.shouldKeepLocal(text)
+    }
+
+    fun matchesMapsLibraryAddress(input: String): Boolean {
+        val text = input.trim().lowercase(Locale.ROOT)
+        val place = listOf("香港中央图书馆", "香港中央圖書館", "hong kong central library").any { it in text }
+        val address = listOf("地址", "位置", "address", "where is").any { it in text }
+        val excluded = listOf("路线", "路線", "导航", "導航", "怎么去", "點樣去", "directions",
+            "route", "opening hours", "开放时间", "開放時間", "电话", "電話", "phone").any { it in text }
+        val otherPlace = listOf("exhibition gallery", "展览馆", "展覽館").any { it in text }
+        return place && address && !excluded && !otherPlace && !SensitiveGoalGuard.shouldKeepLocal(text)
     }
 }
 

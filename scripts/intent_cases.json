@@ -208,5 +208,59 @@
     "text": "Book an elderly services appointment",
     "expected": "unsupported",
     "expected_task_id": ""
+  },
+  {
+    "language": "mandarin",
+    "text": "香港中央图书馆的地址在哪里？",
+    "expected": "match",
+    "expected_task_id": "maps_library_address"
+  },
+  {
+    "language": "cantonese",
+    "text": "我想喺 Google Maps 睇香港中央圖書館嘅地址",
+    "expected": "match",
+    "expected_task_id": "maps_library_address"
+  },
+  {
+    "language": "english",
+    "text": "Show me the address of Hong Kong Central Library in Google Maps",
+    "expected": "match",
+    "expected_task_id": "maps_library_address"
+  },
+  {
+    "language": "mandarin",
+    "text": "帮我找附近图书馆的地址",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "cantonese",
+    "text": "點樣搭車去香港中央圖書館？",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "Get directions to Hong Kong Central Library",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "mandarin",
+    "text": "香港中央图书馆今天几点关门？",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "What is the address of Hong Kong Central Library Exhibition Gallery?",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "Find the address of another library in Google Maps",
+    "expected": "unsupported",
+    "expected_task_id": ""
   }
 ]

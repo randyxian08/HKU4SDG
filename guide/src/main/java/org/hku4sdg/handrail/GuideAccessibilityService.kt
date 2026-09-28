@@ -99,6 +99,7 @@ class GuideAccessibilityService : AccessibilityService() {
         GuideTask.FONT_SIZE -> setOf(SETTINGS_PACKAGE)
         GuideTask.SCREEN_BRIGHTNESS -> setOf(SETTINGS_PACKAGE, SYSTEMUI_PACKAGE)
         GuideTask.CHROME_BOOKMARK -> setOf(CHROME_PACKAGE)
+        GuideTask.MAPS_LIBRARY_ADDRESS -> setOf(MAPS_PACKAGE)
     }
 
     private fun fontTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
@@ -182,6 +183,24 @@ class GuideAccessibilityService : AccessibilityService() {
         else null
     }
 
+    private fun mapsTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        if (root.packageName?.toString() != MAPS_PACKAGE) return null
+        val place = findNode(root) {
+            it.text?.toString() == "Hong Kong Central Library" &&
+                it.contentDescription?.toString() == "Hong Kong Central Library"
+        } ?: return null
+        val address = findNode(root) {
+            it.contentDescription?.toString() ==
+                "Address: 66 Causeway Rd, Causeway Bay, Hong Kong Island, Hong Kong" &&
+                it.isClickable
+        }
+        if (address != null) return GuideStep.MAPS_ADDRESS to address
+        if (findNode(root) {
+            it.text?.toString() == "66 Causeway Rd, Causeway Bay, Hong Kong Island, Hong Kong"
+        } == null) return null
+        return GuideStep.MAPS_PLACE to place
+    }
+
     private fun render(force: Boolean = false) {
         if (currentSessionId != preferences.guideSessionId) {
             currentSessionId = preferences.guideSessionId
@@ -198,19 +217,24 @@ class GuideAccessibilityService : AccessibilityService() {
             if (preferences.activeTask != GuideTask.CHROME_BOOKMARK) shownStep = null
             return
         }
-        // Strictly match the tested Android 15 Settings or Chrome 124 public-page layouts.
+        // Strictly match only the tested Android 15 Settings, Chrome, or Maps layouts.
         val target = when (preferences.activeTask) {
             GuideTask.FONT_SIZE -> fontTarget(root)
             GuideTask.SCREEN_BRIGHTNESS -> brightnessTarget(root)
             GuideTask.CHROME_BOOKMARK -> chromeTarget(root)
+            GuideTask.MAPS_LIBRARY_ADDRESS -> mapsTarget(root)
         }
         if (target == null || (!target.first.isComplete && target.second == null)) {
             tts?.stop()
             cloudTts?.stop()
             if (root.packageName?.toString() !in setOf(SYSTEMUI_PACKAGE, CHROME_PACKAGE)) shownStep = null
             renderKey = null
-            overlay.showStatus(GuideContent.unknown(preferences.textLanguage), false,
-                onResume = {}, onExit = ::endGuide)
+            try {
+                overlay.showStatus(GuideContent.unknown(preferences.textLanguage), false,
+                    onResume = {}, onExit = ::endGuide)
+            } catch (_: WindowManager.BadTokenException) {
+                overlay.clear()
+            }
             return
         }
         val (step, node) = target
@@ -220,21 +244,27 @@ class GuideAccessibilityService : AccessibilityService() {
         val changedStep = shownStep != step
         shownStep = step
         renderKey = key
-        overlay.showStep(
-            step = step,
-            bounds = bounds,
-            message = GuideContent.instruction(step, preferences.textLanguage),
-            textLanguage = preferences.textLanguage,
-            voiceLanguage = preferences.voiceLanguage,
-            collapsed = preferences.collapsed,
-            muted = preferences.muted,
-            onCollapse = { preferences.collapsed = !preferences.collapsed; render(true) },
-            onTextLanguage = { preferences.textLanguage = next(preferences.textLanguage); render(true) },
-            onVoiceLanguage = { preferences.voiceLanguage = next(preferences.voiceLanguage); render(true) },
-            onReplay = { speak(step) },
-            onMute = { preferences.muted = !preferences.muted; if (preferences.muted) { tts?.stop(); cloudTts?.stop() }; render(true) },
-            onExit = ::endGuide
-        )
+        try {
+            overlay.showStep(
+                step = step,
+                bounds = bounds,
+                message = GuideContent.instruction(step, preferences.textLanguage),
+                textLanguage = preferences.textLanguage,
+                voiceLanguage = preferences.voiceLanguage,
+                collapsed = preferences.collapsed,
+                muted = preferences.muted,
+                onCollapse = { preferences.collapsed = !preferences.collapsed; render(true) },
+                onTextLanguage = { preferences.textLanguage = next(preferences.textLanguage); render(true) },
+                onVoiceLanguage = { preferences.voiceLanguage = next(preferences.voiceLanguage); render(true) },
+                onReplay = { speak(step) },
+                onMute = { preferences.muted = !preferences.muted; if (preferences.muted) { tts?.stop(); cloudTts?.stop() }; render(true) },
+                onExit = ::endGuide
+            )
+        } catch (_: WindowManager.BadTokenException) {
+            overlay.clear()
+            renderKey = null
+            return
+        }
         if (changedStep && !step.isComplete) speak(step)
     }
 
@@ -277,6 +307,7 @@ class GuideAccessibilityService : AccessibilityService() {
         private const val SETTINGS_PACKAGE = "com.android.settings"
         private const val SYSTEMUI_PACKAGE = "com.android.systemui"
         private const val CHROME_PACKAGE = "com.android.chrome"
+        private const val MAPS_PACKAGE = "com.google.android.apps.maps"
         private const val FONT_SCALE_KEY = "font_scale"
     }
 }
@@ -312,7 +343,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
             space(root, 19)
             root.addView(tap("结束引导", Design.forest, Design.surface, 16f, onExit),
                 LinearLayout.LayoutParams(-1, dp(52)))
-            addCard(root, null)
+            addCard(root, bounds)
             return
         }
         val number = "第 ${step.number} / ${if (step.task == GuideTask.CHROME_BOOKMARK) 3 else 2} 步"

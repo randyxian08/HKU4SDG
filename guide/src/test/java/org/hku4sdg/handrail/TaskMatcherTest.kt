@@ -44,4 +44,12 @@ class TaskMatcherTest {
         assertTrue(SensitiveGoalGuard.shouldKeepLocal("帮我预约医生"))
         assertFalse(SensitiveGoalGuard.shouldKeepLocal("手机的字体太小"))
     }
+
+    @Test fun mapAddressRequiresExactPlaceAndAddressGoal() {
+        assertEquals(GuideTask.MAPS_LIBRARY_ADDRESS, TaskMatcher.match("香港中央图书馆的地址在哪里？"))
+        assertEquals(GuideTask.MAPS_LIBRARY_ADDRESS, TaskMatcher.match("Where is Hong Kong Central Library?"))
+        assertNull(TaskMatcher.match("怎么导航去香港中央图书馆？"))
+        assertNull(TaskMatcher.match("香港中央图书馆的开放时间"))
+        assertNull(TaskMatcher.match("其他图书馆的地址在哪里？"))
+    }
 }

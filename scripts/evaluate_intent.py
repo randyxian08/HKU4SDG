@@ -24,6 +24,11 @@ BRIGHTNESS_SUPPORTED = ("调高亮度", "提高亮度", "屏幕太暗", "屏幕�
 BOOKMARK_ACTION = ("收藏", "书签", "書籤", "bookmark", "save this page")
 BOOKMARK_SOURCE = ("政府一站通", "govhk", "gov.hk")
 BOOKMARK_PAGE = ("长者服务", "長者服務", "老人服务", "elderly services", "elderly service page")
+MAPS_LIBRARY = ("香港中央图书馆", "香港中央圖書館", "hong kong central library")
+MAPS_ADDRESS = ("地址", "位置", "address", "where is")
+MAPS_EXCLUDED = ("路线", "路線", "导航", "導航", "怎么去", "點樣去", "directions", "route",
+                 "opening hours", "开放时间", "開放時間", "电话", "電話", "phone",
+                 "exhibition gallery", "展览馆", "展覽館")
 
 
 def local_fallback(text: str) -> dict:
@@ -37,6 +42,10 @@ def local_fallback(text: str) -> dict:
             and any(part in text for part in BOOKMARK_SOURCE)
             and any(part in text for part in BOOKMARK_PAGE)):
         return {"decision": "match", "task_id": "chrome_bookmark"}
+    if (any(part in text for part in MAPS_LIBRARY)
+            and any(part in text for part in MAPS_ADDRESS)
+            and not any(part in text for part in MAPS_EXCLUDED)):
+        return {"decision": "match", "task_id": "maps_library_address"}
     return {"decision": "unsupported", "task_id": ""}
 
 
