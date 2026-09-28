@@ -1,0 +1,27 @@
+# 数字扶手｜可演示案例与证据边界
+
+更新于 2026-09-28。下列案例均在 **Android 15 / Pixel 7 英文系统模拟器**上运行，用户只安装 `guide` 一个 APK。它们展示“选目标 → 确认任务 → 跨应用圈出当前一步 → 用户亲手操作 → 核对结果”的已测路径，不是目标用户测试，也不代表任意 Android 手机或第三方 App 都可用。
+
+| 案例 | 用户可以这样提出目标（自编测试句） | 用户亲手完成的动作 | 当前完成条件 | 证据 |
+|---|---|---|---|---|
+| 字太小，看不清 | “手机上的字太小了，想把字体调大” | 在系统设置点 `Display size and text`，拖动 `Font size` | 系统 `font_scale` 实际增加 | [两步与结果](interface.md) |
+| 屏幕太暗 | “屏幕太暗了，请调高亮度” | 在系统设置点 `Brightness level`，拖动滑杆 | `SCREEN_BRIGHTNESS` 实际增加 | [圈画](screenshots/android15-brightness-step1.png)、[完成](screenshots/android15-brightness-done.png) |
+| 下次还想打开长者服务网页 | “把香港政府一站通的长者服务网页收藏起来” | 在 Chrome 点菜单、书签星标，再打开菜单核对 | 指定 GovHK 页面在 Chrome 124 显示 `Edit bookmark` | [步骤](screenshots/android15-chrome-step2.png)、[核验](screenshots/android15-chrome-complete.png) |
+| 想知道中央图书馆地址 | “香港中央图书馆的地址在哪里？” | 在 Google Maps 点开指定地点卡，阅读地址行 | Maps 11.129 显示该地点的地址行 | [地点卡](screenshots/android15-maps-step1.png)、[地址行](screenshots/android15-maps-address.png) |
+
+地址案例只用于**查看**香港中央图书馆地点信息。地图显示 `66 Causeway Rd, Causeway Bay`，与[香港公共图书馆官方资料](https://www.hkpl.gov.hk/tc/locations/central-library/central.html)一致；应用不请求设备位置、不规划路线，也不能证明用户已经记住地址或到访。
+
+## 两个同样要演示的失败案例
+
+1. **页面不符就停下**：Chrome 切到其他网址、Google Maps 切到[香港历史博物馆](screenshots/android15-maps-wrong-place.png)时，旧圈画撤下并提示当前页面未识别。不能凭相似的按钮位置继续指路。
+2. **语音不可用仍可继续**：用户主动录音后，若模拟器麦克风静音，[界面说明识别失败](screenshots/android15-asr-silence.png)，仍可编辑文字或选任务卡。三段自制 TTS 音频经火山 ASR 得到转写，但真人普通话、粤语、英语识别与粤语播报自然度尚未验收。
+
+## AI 与人工分工
+
+三语输入、引导文字和播报语言可分别设置。Debug 模拟器版的 AI 只把用户主动提交的目标文字映射到上述四个已审核任务、请求澄清或拒绝；页面准入、圈画位置和完成条件由本地规则决定。对 [44 条自编三语样本](intent-evaluation.md)，方舟模型 44/44，本地保守规则 33/44，二者范围外错误匹配均为 0。这是开发对照，不是老人实际使用准确率。
+
+## 演示和下一轮验收
+
+五分钟演示可选“字体”作为真实系统变化、“地图地址”作为真实第三方 App，再用“错误地点撤圈”说明安全边界；Chrome 书签和亮度作为备用案例。录屏应标明模拟器型号、Android 和目标 App 版本。
+
+下一轮优先让目标用户在模拟器上独立完成任务，记录误解与求助点；审听真人三语录音和播报，检查 TalkBack 顺序、1.5/2.0 倍字体及折叠卡片；之后再做用户可选择的提示强度和可删除学习记录。在这些验证前，不宣称“已经学会”、任意 App 兼容或真人粤语可用。

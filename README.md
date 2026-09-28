@@ -10,7 +10,7 @@
 
 输入语言、引导文字与 AI 提示、语音播报语言可分别选择普通话、粤语和英语；首页及部分操作控件仍以中文显示。Debug 模拟器版已加入**受约束的真实 AI 意图识别**：用户主动提交的目标文字只可映射到上述四项已审核任务、请求澄清或拒绝；模型不决定跨应用位置和步骤。方舟 Mini 模型在 [44 条固定三语样本](docs/intent-evaluation.md)上为 44/44；这不是面向真实用户的准确率。服务不可用时回退到保守的本地匹配。语音输入的 Debug 模拟器路径已接入火山引擎 ASR，三语合成音频均返回转写；模拟器自身麦克风的真人三语识别与粤语音质尚未验收。本次黑客松以该模拟器为演示设备；当前只适配上述模拟器的已测页面，不应视为任意第三方 App、其他 Android 品牌或版本均可用。
 
-产品定义来自 [飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)。单 App 的信息架构与功能优先级见 [产品体验方案](docs/product-experience.md)；Apple、Android、OpenAI 和 Anthropic 官方资料与本次界面决定见 [界面研究与改版依据](docs/design-research.md)；火山引擎的语音与 AI 接入判断见 [语音选型](docs/volcengine-voice-research.md)；近期功能和比赛节点见 [下一阶段推进顺序](docs/next-sprint.md)；模拟器演示验收见 [MVP 开发计划](docs/mvp-plan.md)。
+产品定义来自 [飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)。四项可讲述的用户场景及失败路径见[可演示案例](docs/demo-cases.md)；单 App 的信息架构与功能优先级见 [产品体验方案](docs/product-experience.md)；Apple、Android、OpenAI 和 Anthropic 官方资料与本次界面决定见 [界面研究与改版依据](docs/design-research.md)；火山引擎的语音与 AI 接入判断见 [语音选型](docs/volcengine-voice-research.md)；近期功能和比赛节点见 [下一阶段推进顺序](docs/next-sprint.md)；模拟器演示验收见 [MVP 开发计划](docs/mvp-plan.md)。
 
 ## 本地运行
 
