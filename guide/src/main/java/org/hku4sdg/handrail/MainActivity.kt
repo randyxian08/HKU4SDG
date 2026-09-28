@@ -17,6 +17,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.PopupMenu
@@ -33,11 +34,15 @@ class MainActivity : Activity() {
     private lateinit var serviceDot: TextView
     private lateinit var serviceRowView: LinearLayout
     private lateinit var speechStatus: TextView
+    private lateinit var intentClient: IntentClient
+    private var taskSuggestedByAi = false
     private var recognizer: SpeechRecognizer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         preferences = GuidePreferences(this)
+        intentClient = IntentClient(this)
+        taskSuggestedByAi = savedInstanceState?.getBoolean("taskSuggestedByAi") ?: false
         when (savedInstanceState?.getString("screen")?.let { runCatching { Screen.valueOf(it) }.getOrNull() }) {
             Screen.TASK -> showTask()
             Screen.LANGUAGES -> showLanguages()
@@ -50,6 +55,7 @@ class MainActivity : Activity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("screen", screen.name)
+        outState.putBoolean("taskSuggestedByAi", taskSuggestedByAi)
         if (::input.isInitialized) outState.putString("goal", input.text.toString())
         super.onSaveInstanceState(outState)
     }
@@ -108,7 +114,7 @@ class MainActivity : Activity() {
             background = Design.ripple(Design.surface, dp(22).toFloat(), Design.line)
             markAsButton()
             contentDescription = "把字调大，系统设置，约一分钟。查看任务"
-            setOnClickListener { showTask() }
+            setOnClickListener { taskSuggestedByAi = false; showTask() }
         }
         task.addView(text("Aa", 21f, Design.forest, true, Gravity.CENTER).apply {
             background = Design.shape(Design.paleGreen, dp(18).toFloat())
@@ -198,7 +204,13 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         composer.addView(composerRow)
         space(composer, 7)
-        speechStatus = text("", 13f, Design.secondary)
+        composer.addView(text("使用在线任务识别时，只发送你提交的目标文字；不会发送屏幕或录音。", 14f, Design.secondary))
+        space(composer, 4)
+        speechStatus = text("", 16f, Design.ink, true).apply {
+            visibility = View.GONE
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = Design.shape(Design.paleGreen, dp(14).toFloat())
+        }
         composer.addView(speechStatus)
         root.addView(composer)
 
@@ -233,8 +245,45 @@ class MainActivity : Activity() {
     }
 
     private fun submitGoal() {
-        if (TaskMatcher.matchesFontSize(input.text.toString())) showTask()
-        else Toast.makeText(this, "目前只支持“把字调大”。你也可以点上方任务。", Toast.LENGTH_LONG).show()
+        val goal = input.text.toString().trim()
+        if (goal.isEmpty()) {
+            setInputStatus("先输入想完成的事，或选择上方任务。")
+            return
+        }
+        if (goal.length > 160) {
+            setInputStatus("目标描述太长，请用一句话说明。")
+            return
+        }
+        if (SensitiveGoalGuard.shouldKeepLocal(goal)) {
+            setInputStatus("这段文字可能涉及私人内容，已停止发送。请使用上方任务卡。")
+            return
+        }
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .hideSoftInputFromWindow(input.windowToken, 0)
+        input.clearFocus()
+        setInputStatus("正在查找已审核的任务…")
+        intentClient.classify(goal, preferences.inputLanguage) { result ->
+            if (screen != Screen.HOME || input.text.toString().trim() != goal) return@classify
+            when (result?.decision) {
+                IntentClient.Decision.MATCH -> {
+                    taskSuggestedByAi = true
+                    showTask()
+                }
+                IntentClient.Decision.CLARIFY -> setInputStatus("你是想把整个手机的字调大吗？请说得具体一点。")
+                IntentClient.Decision.UNSUPPORTED -> setInputStatus("暂时没有这项引导。现在可以选择“把字调大”。")
+                null -> {
+                    if (TaskMatcher.matchesFontSize(goal)) {
+                        taskSuggestedByAi = false
+                        showTask()
+                    } else setInputStatus("AI 暂时不可用。请使用上方已审核的任务卡。")
+                }
+            }
+        }
+    }
+
+    private fun setInputStatus(message: String) {
+        speechStatus.visibility = View.VISIBLE
+        speechStatus.text = message
     }
 
     private fun action(label: String, fill: Int, color: Int, height: Int = 58, click: () -> Unit) =
@@ -321,6 +370,10 @@ class MainActivity : Activity() {
         space(body, 9)
         body.addView(text("把字调大", 30f, Design.ink, true))
         space(body, 12)
+        if (taskSuggestedByAi) {
+            body.addView(text("根据你的描述，找到这项已审核任务。请确认后再开始。", 15f, Design.forest, true))
+            space(body, 10)
+        }
         body.addView(text("接下来会打开手机设置。数字扶手只圈出下一步，点击和拖动都由你完成。", 17f, Design.secondary).apply {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
@@ -487,18 +540,18 @@ class MainActivity : Activity() {
         recognizer?.destroy()
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) { speechStatus.text = "正在聆听…" }
+                override fun onReadyForSpeech(params: Bundle?) { setInputStatus("正在聆听…") }
                 override fun onBeginningOfSpeech() = Unit
                 override fun onRmsChanged(rmsdB: Float) = Unit
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
-                override fun onError(error: Int) { speechStatus.text = "没有听清，请改用文字或任务卡。（错误 $error）" }
+                override fun onError(error: Int) { setInputStatus("没有听清，请改用文字或任务卡。（错误 $error）") }
                 override fun onResults(results: Bundle?) {
                     val transcript = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                     if (transcript != null) {
                         input.setText(transcript)
-                        speechStatus.text = "识别为：$transcript。确认后点箭头。"
-                    } else speechStatus.text = "没有听清，请改用文字或任务卡。"
+                        setInputStatus("识别为：$transcript。确认后点箭头。")
+                    } else setInputStatus("没有听清，请改用文字或任务卡。")
                 }
                 override fun onPartialResults(partialResults: Bundle?) = Unit
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit
@@ -517,6 +570,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         recognizer?.destroy()
+        intentClient.close()
         super.onDestroy()
     }
 }

@@ -81,10 +81,27 @@ class GuidePreferences(private val context: Context) {
     private fun setLanguage(key: String, value: GuideLanguage) { prefs.edit().putString(key, value.name).apply() }
 }
 
-/** A bounded, deterministic fallback for the demo. It is not presented as AI. */
+/** Conservative local fallback for one reviewed task; never presented as AI. */
 object TaskMatcher {
     fun matchesFontSize(input: String): Boolean {
         val text = input.trim().lowercase(Locale.ROOT)
-        return listOf("字", "字体", "啲字", "font", "text", "larger", "bigger").any { it in text }
+        if (listOf("短信", "微信", "whatsapp", "message", "send a text", "text me", "照片", "图片",
+                "photo", "zoom", "调小", "缩小", "smaller", "decrease", "颜色", "colour", "color")
+                .any { it in text }) return false
+        return listOf("把字调大", "字体调大", "字体变大", "字太小", "啲字太细", "放大啲字",
+            "increase font", "larger font", "font size bigger", "make the text bigger",
+            "text size bigger", "larger text", "bigger text").any { it in text }
+    }
+}
+
+/** Stop obvious sensitive goals before the user's text reaches the model bridge. */
+object SensitiveGoalGuard {
+    private val terms = listOf("密码", "验证码", "银行卡", "身份证", "支付", "付款", "转账", "病历",
+        "医生", "医院", "password", "one-time code", "verification code", "credit card",
+        "bank account", "payment", "transfer", "medical", "doctor")
+
+    fun shouldKeepLocal(input: String): Boolean {
+        val text = input.lowercase(Locale.ROOT)
+        return terms.any { it in text } || Regex("[0-9]{6,}").containsMatchIn(text) || '@' in text
     }
 }

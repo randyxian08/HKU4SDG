@@ -1,8 +1,13 @@
 import base64
 import io
 import json
+import os
+import threading
 import unittest
 from unittest.mock import patch
+import urllib.error
+import urllib.request
+from http.server import ThreadingHTTPServer
 
 import voice_proxy
 
@@ -41,6 +46,75 @@ class VoiceProxyTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 voice_proxy.synthesize("hello", "unsupported", "test-key")
             request.assert_not_called()
+
+    def test_intent_uses_only_submitted_goal_and_validates_approved_id(self):
+        captured = {}
+
+        def fake_open(request, timeout):
+            captured["request"] = request
+            captured["timeout"] = timeout
+            return io.BytesIO(json.dumps({"choices": [{"finish_reason": "stop", "message": {
+                "content": '{"decision":"match","task_id":"font_size"}'
+            }}]}).encode())
+
+        with patch.object(voice_proxy.urllib.request, "urlopen", side_effect=fake_open):
+            self.assertEqual(voice_proxy.classify_intent("啲字太细", "cantonese", "test-ark-key"),
+                             {"decision": "match", "task_id": "font_size"})
+        sent = json.loads(captured["request"].data)
+        self.assertEqual(sent["model"], voice_proxy.ARK_MODEL)
+        self.assertEqual(sent["messages"][1]["content"], "Input language: cantonese\nUser goal: 啲字太细")
+        self.assertEqual(sent["response_format"]["type"], "json_schema")
+        self.assertNotIn("screen", json.dumps(sent).lower())
+
+    def test_intent_rejects_model_created_task_or_incomplete_response(self):
+        for content, finish in [
+            ('{"decision":"match","task_id":"make_payment"}', "stop"),
+            ('{"decision":"match","task_id":"font_size"}', "length"),
+            ('{"decision":"unsupported","task_id":"font_size"}', "stop"),
+        ]:
+            answer = {"choices": [{"finish_reason": finish, "message": {"content": content}}]}
+            with self.subTest(content=content, finish=finish), patch.object(
+                    voice_proxy.urllib.request, "urlopen", return_value=io.BytesIO(json.dumps(answer).encode())):
+                with self.assertRaises(RuntimeError):
+                    voice_proxy.classify_intent("hello", "english", "test-ark-key")
+
+    def test_intent_endpoint_fails_closed_without_ark_key(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), voice_proxy.VoiceHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/intent",
+                data=b'{"text":"make the text bigger","language":"english"}',
+                headers={"Content-Type": "application/json"}, method="POST")
+            with patch.dict(os.environ, {"ARK_API_KEY": ""}):
+                with self.assertRaises(urllib.error.HTTPError) as error:
+                    urllib.request.urlopen(request, timeout=2)
+            self.assertEqual(error.exception.code, 503)
+            error.exception.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_sensitive_goal_is_blocked_before_provider(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), voice_proxy.VoiceHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/intent",
+                data=b'{"text":"please enter password 12345678","language":"english"}',
+                headers={"Content-Type": "application/json"}, method="POST")
+            with patch.dict(os.environ, {"ARK_API_KEY": "test-key"}), patch.object(
+                    voice_proxy, "classify_intent") as provider:
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    self.assertEqual(json.load(response), {"decision": "unsupported", "task_id": ""})
+                provider.assert_not_called()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
 
 
 if __name__ == "__main__":
