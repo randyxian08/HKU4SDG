@@ -4,9 +4,9 @@
 
 ## 当前截图
 
-| 首页 | 任务确认 | 三项独立语言设置 | 真实设置第 1 步 | 真实设置第 2 步 | 检测到字体变化 |
+| 早期两任务首页 | 任务确认 | 三项独立语言设置 | 真实设置第 1 步 | 真实设置第 2 步 | 检测到字体变化 |
 |---|---|---|---|---|---|
-| [查看当前双任务首页](screenshots/android15-two-task-home.png) | [查看字体任务](screenshots/android15-one-app-task.png) | [查看](screenshots/android15-one-app-languages.png) | [查看](screenshots/android15-real-settings-step1.png) | [查看](screenshots/android15-real-settings-step2.png) | [查看](screenshots/android15-real-settings-done.png) |
+| [查看早期首页](screenshots/android15-two-task-home.png) | [查看字体任务](screenshots/android15-one-app-task.png) | [查看](screenshots/android15-one-app-languages.png) | [查看](screenshots/android15-real-settings-step1.png) | [查看](screenshots/android15-real-settings-step2.png) | [查看](screenshots/android15-real-settings-done.png) |
 
 这些截图来自 Android 15 / Pixel 7 模拟器。第 1 步圈在系统 `Display size and text` 行，第 2 步圈在 `Font size` 滑块。模拟器字体比例从 1.0 变为 1.5 后显示完成；离开设置到桌面时，圈画和卡片撤下。系统自身的“Font size added to Quick Settings”提示出现时，我们暂时无法确认页面，会撤圈并显示未知页面；提示消失后在已登记页面重新检查。仍需优化这类系统弹窗的恢复体验。
 
