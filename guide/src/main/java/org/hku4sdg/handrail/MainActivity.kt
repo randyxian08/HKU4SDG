@@ -27,7 +27,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
-    private enum class Screen { HOME, TASK, LANGUAGES, PRACTICE }
+    private enum class Screen { HOME, TASK, LANGUAGES, PRACTICE, SETUP, RECOVERY }
     private var screen = Screen.HOME
     private lateinit var preferences: GuidePreferences
     private lateinit var input: EditText
@@ -61,10 +61,18 @@ class MainActivity : Activity() {
             showTask()
             return
         }
+        if (preferences.setupTask != null) {
+            selectedTask = preferences.setupTask!!
+            selectedHelp = preferences.setupHelp
+            showSetup()
+            return
+        }
         when (savedInstanceState?.getString("screen")?.let { runCatching { Screen.valueOf(it) }.getOrNull() }) {
             Screen.TASK -> showTask()
             Screen.LANGUAGES -> showLanguages()
             Screen.PRACTICE -> showPractice()
+            Screen.SETUP -> showSetup()
+            Screen.RECOVERY -> showRecovery()
             else -> {
                 showHome()
                 savedInstanceState?.getString("goal")?.let(input::setText)
@@ -87,7 +95,20 @@ class MainActivity : Activity() {
             preferences.receiptPending = false
             showPractice()
         }
+        if (::preferences.isInitialized && preferences.active) {
+            preferences.pause(PauseReason.USER)
+            if (screen != Screen.SETUP) showRecovery()
+        } else if (screen == Screen.SETUP) showSetup()
         if (::status.isInitialized) updateServiceStatus()
+        // Binding can finish just after returning from Settings. Refresh without starting a task.
+        listOf(500L, 1500L).forEach { delay ->
+            window.decorView.postDelayed({
+                if (!isFinishing && hasWindowFocus()) {
+                    if (screen == Screen.HOME && ::status.isInitialized) updateServiceStatus()
+                    if (screen == Screen.SETUP && serviceEnabled() && GuideAccessibilityService.connected) showSetup()
+                }
+            }, delay)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -134,6 +155,10 @@ class MainActivity : Activity() {
             setOnClickListener { showLanguages() }
         })
         body.addView(topBar)
+        if (preferences.active) {
+            space(body, 18)
+            body.addView(action(SupportCopy.recoveryTitle(preferences.textLanguage), Design.paleGreen, Design.forest, 52) { showRecovery() })
+        }
         space(body, 28)
         body.addView(text("今天想做什么？", 27f, Design.ink, true).apply {
             setLineSpacing(dp(1).toFloat(), 1f)
@@ -276,7 +301,7 @@ class MainActivity : Activity() {
             setPadding(dp(6), 0, dp(6), 0)
             background = Design.ripple(Design.background, dp(12).toFloat())
             markAsButton()
-            setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+            setOnClickListener { showSetup() }
         }
         serviceRowView = serviceRow
         serviceDot = text("●", 14f, Design.forest, true)
@@ -285,10 +310,6 @@ class MainActivity : Activity() {
         serviceRow.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
         serviceRow.addView(text("查看设置  ›", 14f, Design.forest, true))
         body.addView(serviceRow)
-        space(body, 16)
-        body.addView(text("目前只支持上面的任务。无法确认的页面会停止指引。", 14f, Design.secondary).apply {
-            setLineSpacing(dp(3).toFloat(), 1f)
-        })
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -364,7 +385,9 @@ class MainActivity : Activity() {
 
     private fun updateServiceStatus() {
         val enabled = serviceEnabled()
-        status.text = if (enabled) "引导服务已开启" else "开启引导服务"
+        status.text = if (enabled && GuideAccessibilityService.connected) "引导服务已开启"
+            else if (enabled) "引导服务正在连接" else "开启引导服务"
+        serviceRowView.visibility = if (enabled && GuideAccessibilityService.connected) View.GONE else View.VISIBLE
         serviceDot.setTextColor(if (enabled) Design.forest else Design.orange)
         serviceRowView.contentDescription = if (enabled) "引导服务已开启，查看设置" else "引导服务未开启，去设置"
     }
@@ -527,14 +550,14 @@ class MainActivity : Activity() {
             body.addView(text("上次你确认完成过。今天想要多少帮助？", 16f, Design.forest, true))
             space(body, 9)
         }
-        body.addView(action("帮助方式：${selectedHelp.label}  ⌄", Design.paleGreen, Design.forest, 52) {
-            AlertDialog.Builder(this).setTitle("这次想要多少帮助？")
-                .setSingleChoiceItems(HelpMode.entries.map { "${it.label}：${it.description}" }.toTypedArray(),
+        body.addView(action("${SupportCopy.help(preferences.textLanguage)}：${SupportCopy.mode(selectedHelp, preferences.textLanguage)}  ⌄", Design.paleGreen, Design.forest, 52) {
+            AlertDialog.Builder(this).setTitle(SupportCopy.helpTitle(preferences.textLanguage))
+                .setSingleChoiceItems(HelpMode.entries.map { "${SupportCopy.mode(it, preferences.textLanguage)}：${SupportCopy.modeDescription(it, preferences.textLanguage)}" }.toTypedArray(),
                     selectedHelp.ordinal) { dialog, which ->
                     selectedHelp = HelpMode.entries[which]
                     dialog.dismiss()
                     showTask()
-                }.setNegativeButton("保留当前选择", null).show()
+                }.setNegativeButton(SupportCopy.keepChoice(preferences.textLanguage), null).show()
         })
         space(body, 12)
         if (taskSuggestedByAi) {
@@ -657,10 +680,12 @@ class MainActivity : Activity() {
         languageRow(card, "声", "语音播报", { preferences.voiceLanguage }) { preferences.voiceLanguage = it }
         body.addView(card)
         space(body, 20)
+        body.addView(action(SupportCopy.setupTitle(preferences.textLanguage), Design.paleGreen, Design.forest, 52) { showSetup() })
+        space(body, 20)
         body.addView(text("开发版模拟器中，你主动录制的语音经本机代理交给火山引擎识别；其他版本使用设备识别。播报可能把固定引导文字交给云端服务。文字和任务卡始终可用。", 15f, Design.secondary))
     }
 
-    private fun page(title: String): LinearLayout {
+    private fun page(title: String, onBack: () -> Unit = ::showHome): LinearLayout {
         window.statusBarColor = Design.background
         window.navigationBarColor = Design.background
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
@@ -671,10 +696,10 @@ class MainActivity : Activity() {
         }
         val topBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         topBar.addView(text("‹", 31f, Design.forest, gravity = Gravity.CENTER).apply {
-            contentDescription = "返回首页"
+            contentDescription = SupportCopy.backHome(preferences.textLanguage)
             markAsButton()
             background = Design.ripple(Design.background, dp(16).toFloat())
-            setOnClickListener { showHome() }
+            setOnClickListener { onBack() }
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
         topBar.addView(text(title, 17f, Design.ink, true).apply { setPadding(dp(7), 0, 0, 0) })
         body.addView(topBar)
@@ -696,13 +721,10 @@ class MainActivity : Activity() {
     }
 
     private fun startGuide() {
-        if (!serviceEnabled()) {
-            AlertDialog.Builder(this)
-                .setTitle("先开启引导服务")
-                .setMessage("数字扶手需要无障碍服务才能在其他应用上圈出下一步。开启后回到这里继续；操作始终由你完成。")
-                .setNegativeButton("稍后", null)
-                .setPositiveButton("去设置") { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-                .show()
+        if (!serviceEnabled() || !GuideAccessibilityService.connected) {
+            preferences.setupTask = selectedTask
+            preferences.setupHelp = selectedHelp
+            showSetup()
             return
         }
         try {
@@ -743,19 +765,126 @@ class MainActivity : Activity() {
             preferences.helpMode = selectedHelp
             preferences.active = true
             preferences.collapsed = selectedHelp == HelpMode.LIGHT
-            if (selectedTask == GuideTask.CHROME_BOOKMARK) {
-                startActivity(Intent(Intent.ACTION_VIEW,
-                    Uri.parse("https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm"))
-                    .setPackage("com.android.chrome"))
-            } else if (selectedTask == GuideTask.MAPS_LIBRARY_ADDRESS) {
-                startActivity(Intent(Intent.ACTION_VIEW,
-                    Uri.parse("https://www.google.com/maps/search/?api=1&query=Hong%20Kong%20Central%20Library"))
-                    .setPackage("com.google.android.apps.maps"))
-            } else startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+            openTask(preferences.activeTask)
         } catch (_: Exception) {
-            preferences.active = false
+            preferences.pause(PauseReason.SYSTEM_INTERRUPT)
+            showRecovery()
             Toast.makeText(this, "无法打开目标应用，请稍后重试。", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun openTask(task: GuideTask) {
+        when (task) {
+            GuideTask.CHROME_BOOKMARK -> startActivity(Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm"))
+                .setPackage("com.android.chrome"))
+            GuideTask.MAPS_LIBRARY_ADDRESS -> startActivity(Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://www.google.com/maps/search/?api=1&query=Hong%20Kong%20Central%20Library"))
+                .setPackage("com.google.android.apps.maps"))
+            else -> startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+        }
+    }
+
+    private fun openServiceSettings() {
+        runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }.onFailure {
+            Toast.makeText(this, SupportCopy.notReady(preferences.textLanguage), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun leaveSetup() {
+        val task = preferences.setupTask
+        if (task != null) {
+            selectedTask = task
+            selectedHelp = preferences.setupHelp
+            preferences.setupTask = null
+            taskSuggestedByAi = false
+            if (preferences.active) showRecovery() else showTask()
+        } else showHome()
+    }
+
+    private fun showSetup() {
+        screen = Screen.SETUP
+        val l = preferences.textLanguage
+        val switchedOn = serviceEnabled()
+        val enabled = switchedOn && GuideAccessibilityService.connected
+        val body = page(SupportCopy.setupTitle(l), ::leaveSetup)
+        body.addView(text(SupportCopy.setupHeading(l, enabled), 28f, Design.ink, true))
+        space(body, 14)
+        body.addView(text(SupportCopy.setupWhy(l), 17f, Design.secondary))
+        space(body, 22)
+        if (!switchedOn) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(18), dp(18), dp(18), dp(18))
+                background = Design.shape(Design.surface, dp(22).toFloat(), Design.line)
+            }
+            SupportCopy.setupSteps(l).forEachIndexed { index, copy ->
+                card.addView(text("${index + 1}.  $copy", 17f, Design.ink, true))
+                if (index < 2) space(card, 16)
+            }
+            body.addView(card)
+            space(body, 18)
+        }
+        body.addView(text(SupportCopy.setupPrivacy(l), 15f, Design.secondary))
+        space(body, 22)
+        body.addView(text(if (enabled) SupportCopy.ready(l) else if (switchedOn) SupportCopy.connecting(l) else SupportCopy.notReady(l), 17f,
+            if (enabled) Design.forest else Design.secondary, true))
+        space(body, 14)
+        body.addView(action(if (enabled) {
+            if (preferences.setupTask != null) {
+                if (preferences.active) SupportCopy.returnTask(l) else SupportCopy.backToTask(l)
+            } else SupportCopy.backHome(l)
+        } else if (switchedOn) SupportCopy.checkAgain(l) else SupportCopy.openSettings(l), Design.forest, Design.surface, 56) {
+            if (enabled) leaveSetup() else if (switchedOn) showSetup() else openServiceSettings()
+        })
+        if (!enabled) {
+            space(body, 10)
+            body.addView(action(if (preferences.setupTask != null) SupportCopy.backToTask(l) else SupportCopy.backHome(l),
+                Design.background, Design.secondary, 52) { leaveSetup() })
+        }
+    }
+
+    private fun showRecovery() {
+        if (!preferences.active) { showHome(); return }
+        preferences.pause(PauseReason.USER)
+        screen = Screen.RECOVERY
+        val l = preferences.textLanguage
+        val body = page(SupportCopy.recoveryTitle(l))
+        body.addView(text(SupportCopy.recoveryHeading(l), 28f, Design.ink, true))
+        space(body, 14)
+        body.addView(text(SupportCopy.recoveryDetail(l), 17f, Design.secondary))
+        space(body, 24)
+        body.addView(text(SupportCopy.task(preferences.activeTask, l), 23f, Design.ink, true))
+        space(body, 10)
+        body.addView(text("${SupportCopy.help(l)} · ${SupportCopy.mode(preferences.helpMode, l)}", 16f, Design.forest, true))
+        space(body, 26)
+        body.addView(action(if (serviceEnabled()) SupportCopy.continueTask(l) else SupportCopy.setupContinue(l),
+            Design.forest, Design.surface, 56) {
+            if (!serviceEnabled() || !GuideAccessibilityService.connected) {
+                preferences.setupTask = preferences.activeTask
+                preferences.setupHelp = preferences.helpMode
+                showSetup()
+            } else {
+                preferences.resume()
+                try { openTask(preferences.activeTask) } catch (_: Exception) {
+                    preferences.pause(PauseReason.SYSTEM_INTERRUPT)
+                    showRecovery()
+                }
+            }
+        })
+        space(body, 10)
+        body.addView(action(SupportCopy.restart(l), Design.paleGreen, Design.forest, 52) {
+            selectedTask = preferences.activeTask
+            selectedHelp = preferences.helpMode
+            preferences.finish(PracticeOutcome.ENDED)
+            taskSuggestedByAi = false
+            showTask()
+        })
+        space(body, 10)
+        body.addView(action(ExperienceCopy.unconfirmed(l), Design.background, Design.secondary, 52) {
+            preferences.finish(PracticeOutcome.ENDED)
+            showHome()
+        })
     }
 
     private fun taskName(task: GuideTask) = when (task) {
@@ -818,7 +947,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Activity back callback used for this small native-view prototype")
     override fun onBackPressed() {
-        if (screen == Screen.HOME) super.onBackPressed() else showHome()
+        if (screen == Screen.HOME) super.onBackPressed() else if (screen == Screen.SETUP) leaveSetup() else showHome()
     }
 
     private fun beginListening() {

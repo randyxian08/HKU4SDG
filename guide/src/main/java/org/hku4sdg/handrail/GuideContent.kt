@@ -156,17 +156,36 @@ class GuidePreferences(private val context: Context) {
     fun records(): List<PracticeRecord> = PracticeLedger.decode(practice.getString("records", "") ?: "")
     fun clearRecords() { practice.edit().clear().apply(); receiptPending = false }
     fun finish(outcome: PracticeOutcome) {
-        if (!active) return
+        if (!active || (outcome == PracticeOutcome.CONFIRMED && !sessionState.canConfirm)) return
         val now = System.currentTimeMillis()
         val duration = if (sessionStart > 0) ((now - sessionStart) / 1000).coerceIn(0, 86_400) else 0
         val record = PracticeRecord(guideSessionId, activeTask, helpMode, outcome, now, duration)
         practice.edit().putString("records", PracticeLedger.encode(PracticeLedger.append(records(), record))).apply()
-        active = false
+        sessionState = sessionState.finish(outcome)
         receiptPending = outcome == PracticeOutcome.CONFIRMED
     }
     var active: Boolean
-        get() = prefs.getBoolean("active", false)
-        set(value) { prefs.edit().putBoolean("active", value).apply() }
+        get() = sessionState.active
+        set(value) { sessionState = if (value) SessionState(SessionPhase.RUNNING) else SessionState() }
+    var sessionState: SessionState
+        get() {
+            val phase = runCatching { SessionPhase.valueOf(prefs.getString("sessionPhase", "")!!) }
+                .getOrDefault(if (prefs.getBoolean("active", false)) SessionPhase.RUNNING else SessionPhase.IDLE)
+            val reason = if (phase == SessionPhase.PAUSED)
+                runCatching { PauseReason.valueOf(prefs.getString("pauseReason", "")!!) }
+                    .getOrDefault(PauseReason.SERVICE_RESTART) else null
+            return SessionState(phase, reason)
+        }
+        set(value) { prefs.edit().putBoolean("active", value.active).putString("sessionPhase", value.phase.name)
+            .putString("pauseReason", value.reason?.name).apply() }
+    fun pause(reason: PauseReason) { sessionState = sessionState.pause(reason) }
+    fun resume() { sessionState = sessionState.resume() }
+    var setupTask: GuideTask?
+        get() = GuideTask.fromId(prefs.getString("setupTask", "") ?: "")
+        set(value) { prefs.edit().putString("setupTask", value?.id).apply() }
+    var setupHelp: HelpMode
+        get() = runCatching { HelpMode.valueOf(prefs.getString("setupHelp", "FULL")!!) }.getOrDefault(HelpMode.FULL)
+        set(value) { prefs.edit().putString("setupHelp", value.name).apply() }
     var initialFontScale: Float
         get() = prefs.getFloat("initialFontScale", 1f)
         set(value) { prefs.edit().putFloat("initialFontScale", value).apply() }

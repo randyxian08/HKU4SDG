@@ -1,3 +1,3 @@
 <resources>
-    <string name="accessibility_description">仅在已支持的系统设置页面读取必要的控件位置并圈出下一步；离开或无法确认页面时撤下圈画。不会代替用户点击，不上传页面内容。语音输入另由设备识别服务处理。</string>
+    <string name="accessibility_description">仅在已审核的设置、指定公开网页和地图地点页面匹配必要控件，圈出下一步。离开、暂停或无法确认页面时撤圈并停播；由你决定是否继续。不会代点，不上传屏幕。语音识别在你主动录音后另行处理。</string>
 </resources>

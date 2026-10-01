@@ -14,6 +14,8 @@
 
 产品定义来自 [飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)。四项可讲述的用户场景及失败路径见[可演示案例](docs/demo-cases.md)；单 App 的信息架构与功能优先级见 [产品体验方案](docs/product-experience.md)；Apple、Android、OpenAI 和 Anthropic 官方资料与本次界面决定见 [界面研究与改版依据](docs/design-research.md)；火山引擎的语音与 AI 接入判断见 [语音选型](docs/volcengine-voice-research.md)；近期功能和比赛节点见 [下一阶段推进顺序](docs/next-sprint.md)；模拟器演示验收见 [MVP 开发计划](docs/mvp-plan.md)。
 
+2026-10-02 进一步加入首次设置与任务恢复：权限未开时保留原任务和帮助选择；离开目标应用、主动暂停、服务重连或应用重启后，等待用户继续并重新识别页面。暂停不记成完成，恢复沿用原尝试；重新开始才创建新尝试。求助控件、首次设置和恢复页跟随三种文字语言。截图、操作录像入口和验收范围见[首次设置与中断恢复](docs/setup-recovery.md)。
+
 ## 本地运行
 
 需要 Android Studio、Android SDK Platform 35、Build Tools 35、Platform Tools 和 JDK 17。连接已允许 USB 调试的设备或运行模拟器后：
@@ -24,7 +26,7 @@ source scripts/dev-env.sh
 ./scripts/install-app.sh
 ```
 
-在系统无障碍设置中，用户须手动开启“数字扶手 · 手机引导”。打开数字扶手并确认一项任务，再进入系统设置、Chrome 或 Google Maps。亮度演示需先把系统亮度设在未达最大值、关闭自动亮度的状态。Chrome 演示限定已测公开网页和 Chrome 124 布局；Maps 演示限定香港中央图书馆地点卡和 Maps 11.129 布局。语音输入首次使用时会说明录音去向；拒绝麦克风后仍可用文字和任务卡。
+打开数字扶手，选择任务和帮助方式。服务未开启时，应用会说明权限用途并带用户进入系统无障碍设置；用户须亲手开启“数字扶手 · 手机引导”，用返回键回到应用，再确认任务开始。亮度演示需先把系统亮度设在未达最大值、关闭自动亮度的状态。Chrome 演示限定已测公开网页和 Chrome 124 布局；Maps 演示限定香港中央图书馆地点卡和 Maps 11.129 布局。语音输入首次使用时会说明录音去向；拒绝麦克风后仍可用文字和任务卡。
 
 团队如需回归早期模拟流程，可用 `scripts/install-demo.sh` 安装内部测试夹具。这个脚本不用于对外演示或用户安装说明。
 
