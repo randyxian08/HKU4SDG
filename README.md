@@ -6,7 +6,9 @@
 
 ## 目前能实际演示什么
 
-在 Android 15 / Pixel 7 模拟器上有四项真实任务：两项英文系统设置任务“把字调大”“调高屏幕亮度”，在 Chrome 124 收藏 [GovHK 长者服务公开网页](https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm)，以及在 Google Maps 11.129 查看[香港中央图书馆](https://www.hkpl.gov.hk/tc/locations/central-library/central.html)地址。前两项分别以系统 `font_scale`、`SCREEN_BRIGHTNESS` 的实际增加判断完成；Chrome 任务以显示 `Edit bookmark` 判断完成；Maps 任务以指定地点的地址行出现判断完成，不提供路线导航。离开已识别页面会撤下圈画；不认识的页面停止指引。模拟器截图见 [产品界面与验证记录](docs/interface.md)。
+在 Android 15 / Pixel 7 模拟器上有四项真实任务：两项英文系统设置任务“把字调大”“调高屏幕亮度”，在 Chrome 124 收藏 [GovHK 长者服务公开网页](https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm)，以及在 Google Maps 11.129 查看[香港中央图书馆](https://www.hkpl.gov.hk/tc/locations/central-library/central.html)地址。前两项分别以系统 `font_scale`、`SCREEN_BRIGHTNESS` 的实际增加检测结果；Chrome 任务以显示 `Edit bookmark` 检测收藏结果；Maps 任务以指定地点的地址行出现检测展示结果，之后均等待用户确认，不提供路线导航。离开已识别页面会撤下圈画；不认识的页面停止指引。模拟器截图见 [产品界面与验证记录](docs/interface.md)。
+
+2026-10-02 已补齐完成后的闭环：检测到结果后等待用户亲自确认，字体和亮度可继续调整；开始前可选完整指引、轻提示或自己先试试。按需模式通过“给我提示”恢复当前一步，换步后重新由用户决定；本机保留最近 20 次可删除的练习记录，区分确认完成与未确认退出。大字体把设置目标挤出视口时，会先提示用户滚动，控件可见后再圈画。验收范围和下一轮产品选择见[产品质量迭代](docs/product-quality.md)。
 
 输入语言、引导文字与 AI 提示、语音播报语言可分别选择普通话、粤语和英语；首页及部分操作控件仍以中文显示。Debug 模拟器版已加入**受约束的真实 AI 意图识别**：用户主动提交的目标文字只可映射到上述四项已审核任务、请求澄清或拒绝；模型不决定跨应用位置和步骤。方舟 Mini 模型在 [44 条固定三语样本](docs/intent-evaluation.md)上为 44/44；这不是面向真实用户的准确率。服务不可用时回退到保守的本地匹配。语音输入的 Debug 模拟器路径已接入火山引擎 ASR，三语合成音频均返回转写；模拟器自身麦克风的真人三语识别与粤语音质尚未验收。本次黑客松以该模拟器为演示设备；当前只适配上述模拟器的已测页面，不应视为任意第三方 App、其他 Android 品牌或版本均可用。
 

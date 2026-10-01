@@ -5,7 +5,9 @@
         <package android:name="com.android.settings" />
         <intent><action android:name="android.speech.RecognitionService" /></intent>
     </queries>
-    <application android:label="数字扶手" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <application android:label="数字扶手" android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

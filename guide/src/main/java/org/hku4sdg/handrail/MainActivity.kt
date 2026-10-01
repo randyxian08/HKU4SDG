@@ -27,7 +27,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
-    private enum class Screen { HOME, TASK, LANGUAGES }
+    private enum class Screen { HOME, TASK, LANGUAGES, PRACTICE }
     private var screen = Screen.HOME
     private lateinit var preferences: GuidePreferences
     private lateinit var input: EditText
@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private lateinit var cloudAsr: CloudAsr
     private var selectedTask = GuideTask.FONT_SIZE
     private var taskSuggestedByAi = false
+    private var selectedHelp = HelpMode.FULL
     private var recognizer: SpeechRecognizer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,9 +51,20 @@ class MainActivity : Activity() {
         selectedTask = savedInstanceState?.getString("selectedTask")?.let(GuideTask::fromId)
             ?: GuideTask.FONT_SIZE
         taskSuggestedByAi = savedInstanceState?.getBoolean("taskSuggestedByAi") ?: false
+        selectedHelp = savedInstanceState?.getString("help")?.let {
+            runCatching { HelpMode.valueOf(it) }.getOrNull()
+        } ?: HelpMode.FULL
+        if (intent.getBooleanExtra("return_to_task", false)) {
+            intent.removeExtra("return_to_task")
+            selectedTask = preferences.activeTask
+            taskSuggestedByAi = false
+            showTask()
+            return
+        }
         when (savedInstanceState?.getString("screen")?.let { runCatching { Screen.valueOf(it) }.getOrNull() }) {
             Screen.TASK -> showTask()
             Screen.LANGUAGES -> showLanguages()
+            Screen.PRACTICE -> showPractice()
             else -> {
                 showHome()
                 savedInstanceState?.getString("goal")?.let(input::setText)
@@ -64,13 +76,29 @@ class MainActivity : Activity() {
         outState.putString("screen", screen.name)
         outState.putBoolean("taskSuggestedByAi", taskSuggestedByAi)
         outState.putString("selectedTask", selectedTask.id)
+        outState.putString("help", selectedHelp.name)
         if (::input.isInitialized) outState.putString("goal", input.text.toString())
         super.onSaveInstanceState(outState)
     }
 
     override fun onResume() {
         super.onResume()
+        if (::preferences.isInitialized && preferences.receiptPending) {
+            preferences.receiptPending = false
+            showPractice()
+        }
         if (::status.isInitialized) updateServiceStatus()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra("return_to_task", false)) {
+            intent.removeExtra("return_to_task")
+            selectedTask = preferences.activeTask
+            taskSuggestedByAi = false
+            showTask()
+        }
     }
 
     private fun showHome() {
@@ -92,6 +120,11 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(dp(38), dp(38)))
         topBar.addView(text("数字扶手", 18f, Design.ink, true).apply { setPadding(dp(10), 0, 0, 0) },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        topBar.addView(action("记录", Design.background, Design.forest, 48) { showPractice() }.apply {
+            minWidth = dp(52)
+            contentDescription = "查看练习记录"
+        })
+        topBar.addView(View(this), LinearLayout.LayoutParams(dp(8), 1))
         topBar.addView(text("语言", 15f, Design.forest, true, Gravity.CENTER).apply {
             minHeight = dp(48)
             minWidth = dp(56)
@@ -101,13 +134,13 @@ class MainActivity : Activity() {
             setOnClickListener { showLanguages() }
         })
         body.addView(topBar)
-        space(body, 30)
-        body.addView(text("你想在手机上\n完成什么？", 28f, Design.ink, true).apply {
+        space(body, 28)
+        body.addView(text("今天想做什么？", 27f, Design.ink, true).apply {
             setLineSpacing(dp(1).toFloat(), 1f)
         })
         space(body, 11)
         body.addView(text("选一个任务，跟着提示自己完成。", 16f, Design.secondary))
-        space(body, 33)
+        space(body, 24)
 
         val section = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         section.addView(text("可用引导", 18f, Design.ink, true), LinearLayout.LayoutParams(0, -2, 1f))
@@ -306,7 +339,7 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         composer.addView(composerRow)
         space(composer, 7)
-        composer.addView(text("AI 任务识别只接收你确认提交的文字；语音输入需你主动录音。不会发送屏幕。", 14f, Design.secondary))
+        composer.addView(text("只发送你提交的目标，不发送屏幕。", 14f, Design.secondary))
         space(composer, 4)
         speechStatus = text("", 16f, Design.ink, true).apply {
             visibility = View.GONE
@@ -486,6 +519,23 @@ class MainActivity : Activity() {
             brightness -> "调高屏幕亮度"
             else -> "把字调大"
         }, 30f, Design.ink, true))
+        space(body, 16)
+        val previous = preferences.records().firstOrNull {
+            it.task == selectedTask && it.outcome == PracticeOutcome.CONFIRMED
+        }
+        if (previous != null) {
+            body.addView(text("上次你确认完成过。今天想要多少帮助？", 16f, Design.forest, true))
+            space(body, 9)
+        }
+        body.addView(action("帮助方式：${selectedHelp.label}  ⌄", Design.paleGreen, Design.forest, 52) {
+            AlertDialog.Builder(this).setTitle("这次想要多少帮助？")
+                .setSingleChoiceItems(HelpMode.entries.map { "${it.label}：${it.description}" }.toTypedArray(),
+                    selectedHelp.ordinal) { dialog, which ->
+                    selectedHelp = HelpMode.entries[which]
+                    dialog.dismiss()
+                    showTask()
+                }.setNegativeButton("保留当前选择", null).show()
+        })
         space(body, 12)
         if (taskSuggestedByAi) {
             body.addView(text(GuideContent.intentMatched(preferences.textLanguage), 15f, Design.forest, true))
@@ -676,11 +726,23 @@ class MainActivity : Activity() {
                 }
             } else if (selectedTask == GuideTask.FONT_SIZE) {
                 preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", 1f)
+                if (preferences.initialFontScale >= 1.99f) {
+                    AlertDialog.Builder(this).setTitle("字体已经是最大一档")
+                        .setMessage("这台演示设备现在无法再把字调大。你可以去设置中按阅读习惯自行调整。")
+                        .setNegativeButton("返回", null)
+                        .setPositiveButton("去自己调整") { _, _ -> startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS)) }
+                        .show()
+                    return
+                }
             }
+            if (preferences.active) preferences.finish(PracticeOutcome.ENDED)
             preferences.activeTask = selectedTask
             preferences.guideSessionId += 1
+            preferences.sessionStart = System.currentTimeMillis()
+            preferences.receiptPending = false
+            preferences.helpMode = selectedHelp
             preferences.active = true
-            preferences.collapsed = false
+            preferences.collapsed = selectedHelp == HelpMode.LIGHT
             if (selectedTask == GuideTask.CHROME_BOOKMARK) {
                 startActivity(Intent(Intent.ACTION_VIEW,
                     Uri.parse("https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm"))
@@ -694,6 +756,64 @@ class MainActivity : Activity() {
             preferences.active = false
             Toast.makeText(this, "无法打开目标应用，请稍后重试。", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun taskName(task: GuideTask) = when (task) {
+        GuideTask.FONT_SIZE -> "把字调大"
+        GuideTask.SCREEN_BRIGHTNESS -> "调高屏幕亮度"
+        GuideTask.CHROME_BOOKMARK -> "收藏长者服务网页"
+        GuideTask.MAPS_LIBRARY_ADDRESS -> "查看中央图书馆地址"
+    }
+
+    private fun showPractice() {
+        screen = Screen.PRACTICE
+        val body = page("练习记录")
+        body.addView(text("你的每一次尝试", 25f, Design.ink, true))
+        space(body, 12)
+        body.addView(text("再做一次时，按需要选择帮助。记录只留在这台设备，最多 20 次。", 16f, Design.secondary))
+        space(body, 22)
+        val records = preferences.records()
+        if (records.isEmpty()) {
+            body.addView(text("还没有练习记录", 21f, Design.ink, true))
+            space(body, 10)
+            body.addView(text("从一项你需要的任务开始，完成后亲自确认。", 17f, Design.secondary))
+            space(body, 20)
+            body.addView(action("去选一个任务", Design.forest, Design.surface, 56) { showHome() })
+            return
+        }
+        records.forEach { record ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(18), dp(18), dp(18), dp(18))
+                background = Design.shape(Design.surface, dp(22).toFloat(), Design.line)
+            }
+            card.addView(text(taskName(record.task), 21f, Design.ink, true))
+            space(card, 8)
+            card.addView(text(if (record.outcome == PracticeOutcome.CONFIRMED)
+                "你已确认完成" else "已结束 · 尚未确认完成", 16f, Design.forest, true))
+            space(card, 7)
+            val time = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(record.timestamp))
+            card.addView(text("$time · ${record.mode.label}", 14f, Design.secondary))
+            space(card, 12)
+            card.addView(action("再试一次，自选帮助", Design.paleGreen, Design.forest, 52) {
+                selectedTask = record.task
+                selectedHelp = HelpMode.FULL
+                taskSuggestedByAi = false
+                showTask()
+            })
+            body.addView(card)
+            space(body, 12)
+        }
+        space(body, 10)
+        body.addView(text("完成一次不代表已经学会。记录不含页面、输入内容或录音。", 14f, Design.secondary))
+        space(body, 12)
+        body.addView(action("清除所有练习记录", Design.background, Design.secondary, 52) {
+            AlertDialog.Builder(this).setTitle("清除这台设备的练习记录？")
+                .setMessage("任务和语言设置会保留，练习记录将全部删除。")
+                .setNegativeButton("保留", null)
+                .setPositiveButton("清除记录") { _, _ -> preferences.clearRecords(); showPractice() }.show()
+        })
     }
 
     @Deprecated("Activity back callback used for this small native-view prototype")

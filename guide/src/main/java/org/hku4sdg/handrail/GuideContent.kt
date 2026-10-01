@@ -25,7 +25,9 @@ enum class GuideTask(val id: String) {
 }
 
 enum class GuideStep(val task: GuideTask, val number: Int) {
+    DISPLAY_SCROLL(GuideTask.FONT_SIZE, 1),
     DISPLAY_SIZE(GuideTask.FONT_SIZE, 1),
+    SLIDER_SCROLL(GuideTask.FONT_SIZE, 2),
     SLIDER(GuideTask.FONT_SIZE, 2),
     COMPLETE(GuideTask.FONT_SIZE, 2),
     BRIGHTNESS_ROW(GuideTask.SCREEN_BRIGHTNESS, 1),
@@ -40,6 +42,7 @@ enum class GuideStep(val task: GuideTask, val number: Int) {
 
     val isComplete get() = this == COMPLETE || this == BRIGHTNESS_COMPLETE ||
         this == CHROME_COMPLETE || this == MAPS_ADDRESS
+    val isScrollHint get() = this == DISPLAY_SCROLL || this == SLIDER_SCROLL
 }
 
 /** Fixed copy for the reviewed Android 15 / Pixel 7 emulator flow. Native-speaker review is pending. */
@@ -76,6 +79,8 @@ object GuideContent {
 
     fun instruction(step: GuideStep, language: GuideLanguage): String = when (language) {
         GuideLanguage.MANDARIN -> when (step) {
+            GuideStep.DISPLAY_SCROLL -> "在提示卡外向上滑动页面，找到“Display size and text”。"
+            GuideStep.SLIDER_SCROLL -> "在提示卡外向上滑动页面，找到“Font size”滑块。"
             GuideStep.DISPLAY_SIZE -> "请点圈住的“Display size and text”。"
             GuideStep.SLIDER -> "请亲手把圈住的“Font size”滑块向右拖动。"
             GuideStep.COMPLETE -> "已检测到系统字体变大。请看看现在的文字是否更容易阅读。"
@@ -90,6 +95,8 @@ object GuideContent {
             GuideStep.MAPS_ADDRESS -> "地图已显示香港中央图书馆的地址。请看圈住的地址行；出行前也可向图书馆核对。"
         }
         GuideLanguage.CANTONESE -> when (step) {
+            GuideStep.DISPLAY_SCROLL -> "喺提示卡外向上扫页面，搵「Display size and text」。"
+            GuideStep.SLIDER_SCROLL -> "喺提示卡外向上扫页面，搵「Font size」滑桿。"
             GuideStep.DISPLAY_SIZE -> "请㩒圈住嘅「Display size and text」。"
             GuideStep.SLIDER -> "请自己将圈住嘅「Font size」滑桿向右拖。"
             GuideStep.COMPLETE -> "系统字体已经变大。睇下而家啲字系咪易睇咗。"
@@ -104,6 +111,8 @@ object GuideContent {
             GuideStep.MAPS_ADDRESS -> "地图已经显示香港中央图书馆嘅地址。请睇圈住嘅地址；出发前亦可以向图书馆核对。"
         }
         GuideLanguage.ENGLISH -> when (step) {
+            GuideStep.DISPLAY_SCROLL -> "Swipe up outside this card to find “Display size and text”."
+            GuideStep.SLIDER_SCROLL -> "Swipe up outside this card to find the “Font size” slider."
             GuideStep.DISPLAY_SIZE -> "Tap the circled “Display size and text” row."
             GuideStep.SLIDER -> "Drag the circled “Font size” slider to the right."
             GuideStep.COMPLETE -> "The system font is larger. Check whether the text is easier to read."
@@ -134,6 +143,27 @@ object GuideContent {
 
 class GuidePreferences(private val context: Context) {
     private val prefs = context.getSharedPreferences("guide", Context.MODE_PRIVATE)
+    private val practice = context.getSharedPreferences("practice", Context.MODE_PRIVATE)
+    var helpMode: HelpMode
+        get() = runCatching { HelpMode.valueOf(prefs.getString("helpMode", "FULL")!!) }.getOrDefault(HelpMode.FULL)
+        set(value) { prefs.edit().putString("helpMode", value.name).apply() }
+    var sessionStart: Long
+        get() = prefs.getLong("sessionStart", 0)
+        set(value) { prefs.edit().putLong("sessionStart", value).apply() }
+    var receiptPending: Boolean
+        get() = prefs.getBoolean("receiptPending", false)
+        set(value) { prefs.edit().putBoolean("receiptPending", value).apply() }
+    fun records(): List<PracticeRecord> = PracticeLedger.decode(practice.getString("records", "") ?: "")
+    fun clearRecords() { practice.edit().clear().apply(); receiptPending = false }
+    fun finish(outcome: PracticeOutcome) {
+        if (!active) return
+        val now = System.currentTimeMillis()
+        val duration = if (sessionStart > 0) ((now - sessionStart) / 1000).coerceIn(0, 86_400) else 0
+        val record = PracticeRecord(guideSessionId, activeTask, helpMode, outcome, now, duration)
+        practice.edit().putString("records", PracticeLedger.encode(PracticeLedger.append(records(), record))).apply()
+        active = false
+        receiptPending = outcome == PracticeOutcome.CONFIRMED
+    }
     var active: Boolean
         get() = prefs.getBoolean("active", false)
         set(value) { prefs.edit().putBoolean("active", value).apply() }
