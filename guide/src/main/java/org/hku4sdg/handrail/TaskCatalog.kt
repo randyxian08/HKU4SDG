@@ -43,10 +43,23 @@ object TaskCatalog {
             "reviewed address row detected; user confirms seeing it")
     )
     fun entry(task: GuideTask) = tasks.single { it.task == task }
+    fun reviewedDevice(profile: DeviceProfile) = profile.sdk == 35 &&
+        profile.hardware in setOf("ranchu", "goldfish") && profile.model == "sdk_gphone64_arm64" &&
+        profile.systemLanguage == "en"
+
+    /** Phone Settings use runtime semantic checks; availability is not a device review claim. */
+    fun experimental(task: GuideTask, profile: DeviceProfile) = !reviewedDevice(profile) &&
+        task in setOf(GuideTask.FONT_SIZE, GuideTask.SCREEN_BRIGHTNESS)
+
     fun block(task: GuideTask, profile: DeviceProfile): TaskBlock? {
-        if (profile.sdk != 35 || profile.hardware !in setOf("ranchu", "goldfish") ||
-            profile.model != "sdk_gphone64_arm64") return TaskBlock.SYSTEM
-        if (profile.systemLanguage != "en") return TaskBlock.LANGUAGE
+        if (task in setOf(GuideTask.FONT_SIZE, GuideTask.SCREEN_BRIGHTNESS)) {
+            if (profile.sdk !in 26..36) return TaskBlock.SYSTEM
+            if (profile.systemLanguage !in setOf("en", "zh")) return TaskBlock.LANGUAGE
+        } else {
+            if (profile.sdk != 35 || profile.hardware !in setOf("ranchu", "goldfish") ||
+                profile.model != "sdk_gphone64_arm64") return TaskBlock.SYSTEM
+            if (profile.systemLanguage != "en") return TaskBlock.LANGUAGE
+        }
         val entry = entry(task)
         val version = profile.installedVersions[entry.packageName] ?: return TaskBlock.MISSING_APP
         if (entry.appVersion != null && version != entry.appVersion) return TaskBlock.VERSION

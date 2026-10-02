@@ -186,7 +186,8 @@ class MainActivity : Activity() {
         val count = GuideTask.entries.count { TaskCatalog.block(it, profile) == null }
         val section = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         section.addView(text(c("手机上的日常事", "手机上嘅日常事", "Everyday tasks"), 18f, Design.ink, true).heading(), LinearLayout.LayoutParams(0, -2, 1f))
-        section.addView(text(c("$count 项可用", "$count 项可用", "$count ready"), 14f, Design.secondary))
+        section.addView(text(if (TaskCatalog.reviewedDevice(profile)) c("$count 项可用", "$count 项可用", "$count ready")
+            else c("$count 项可试", "$count 项可以试", "$count to try"), 14f, Design.secondary))
         body.addView(section)
         space(body, 14)
         val tasks = LinearLayout(this).apply {
@@ -196,7 +197,9 @@ class MainActivity : Activity() {
         GuideTask.entries.forEachIndexed { index, task ->
             val block = TaskCatalog.block(task, profile)
             val title = AppCopy.shortTask(task, l)
-            val subtitle = if (block == null) "${AppCopy.app(task, l)} · ${AppCopy.time(l)}"
+            val subtitle = if (block == null && TaskCatalog.experimental(task, profile))
+                c("手机实验引导 · 可以尝试", "手机实验指引 · 可以试", "Phone trial · Try this guide")
+                else if (block == null) "${AppCopy.app(task, l)} · ${AppCopy.time(l)}"
                 else c("暂不可用 · 查看原因", "暂时用唔到 · 睇原因", "Unavailable · See why")
             val row = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -458,12 +461,20 @@ class MainActivity : Activity() {
             body.addView(text(GuideContent.intentMatched(l), 15f, Design.forest))
         }
         val block = TaskAvailability.block(this, selectedTask)
+        val phoneTrial = block == null && TaskAvailability.experimental(this, selectedTask)
         if (block != null) {
             space(body, 18)
             body.addView(text(TaskAvailability.reason(block, l), 17f, Design.ink, true).apply {
                 setPadding(dp(16), dp(16), dp(16), dp(16))
                 background = Design.shape(Design.paleOrange, dp(18).toFloat())
                 accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            })
+        }
+        if (phoneTrial) {
+            space(body, 18)
+            body.addView(text(PhoneGuideCopy.notice(l), 16f, Design.ink).apply {
+                setPadding(dp(16), dp(16), dp(16), dp(16))
+                background = Design.shape(Design.paleOrange, dp(18).toFloat())
             })
         }
         space(body, 24)
@@ -489,7 +500,7 @@ class MainActivity : Activity() {
             setPadding(dp(16), dp(8), dp(16), dp(8))
             background = Design.shape(Design.surface, dp(20).toFloat(), Design.line)
         }
-        AppCopy.steps(selectedTask, l).forEachIndexed { index, copy ->
+        (if (phoneTrial) PhoneGuideCopy.steps(selectedTask, l) else AppCopy.steps(selectedTask, l)).forEachIndexed { index, copy ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(60); setPadding(0, dp(12), 0, dp(12)) }
             row.addView(text((index + 1).toString(), 14f, Design.forest, true, Gravity.CENTER).apply {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -500,7 +511,7 @@ class MainActivity : Activity() {
         }
         body.addView(steps)
         space(body, 16)
-        val details = text(AppCopy.scope(selectedTask, l), 14f, Design.secondary).apply {
+        val details = text(if (phoneTrial) PhoneGuideCopy.scope(l) else AppCopy.scope(selectedTask, l), 14f, Design.secondary).apply {
             visibility = View.GONE
             setPadding(dp(4), dp(10), dp(4), dp(12))
         }
@@ -557,7 +568,10 @@ class MainActivity : Activity() {
         space(body, 24)
         body.addView(text(c("语音与隐私", "语音同私隐", "Speech and privacy"), 18f, Design.ink, true).heading())
         space(body, 10)
-        body.addView(text(c("语音输入只在你点按后录制。开发版的录音会送到火山引擎识别，应用和本机代理不保存音频。其他版本使用设备识别；保留方式取决于服务。播报可把固定提示交给云端。你始终可以只用文字。", "语音输入只喺你㩒掣后录音。开发版录音会交俾火山引擎识别，应用同本机代理唔储存音频。其他版本用设备识别；保留方式视乎服务。播报可将固定提示交俾云端。你一直可以只用文字。", "Speech is recorded only after you tap Speak. In this development build, audio goes to Volcano Engine for recognition; the app and local proxy do not save it. Other builds use the device service, whose retention rules apply. Fixed guidance may be sent to cloud speech. Text is always available."), 15f, Design.secondary))
+        val privacy = if (cloudAsr.enabled)
+            c("语音输入只在你点按后录制。当前模拟器的录音会送到火山引擎识别，应用和本机代理不保存音频。播报可把固定提示交给云端。你始终可以只用文字。", "语音输入只喺你㩒掣后录音。而家模拟器嘅录音会交俾火山引擎识别，应用同本机代理唔储存音频。播报可将固定提示交俾云端。你一直可以只用文字。", "Recording starts only after you tap Speak. This emulator sends audio to Volcano Engine; the app and local proxy do not save it. Fixed guidance may go to cloud speech. Text is always available.")
+        else c("语音输入只在你点按后录制，由设备语音识别服务处理；它可能联网，保留方式取决于该服务。播报使用本机语音服务，支持的语言取决于已安装的语音。当前手机不连接火山开发代理，文字和任务卡始终可用。", "语音输入只喺你㩒掣后录音，由设备语音识别服务处理；佢可能联网，保留方式视乎服务。播报用本机语音服务，支持嘅语言视乎已安装嘅语音。而家手机唔连接火山开发代理，文字同任务卡一直都用得。", "Recording starts only after you tap Speak. The device recognition service may use the internet; its retention rules apply. Speech output uses installed device voices. This phone does not connect to the Volcano development proxy. Text and task cards remain available.")
+        body.addView(text(privacy, 15f, Design.secondary))
     }
 
     private fun topBar(title: String, onBack: () -> Unit): LinearLayout = LinearLayout(this).apply {
@@ -608,15 +622,15 @@ class MainActivity : Activity() {
                 preferences.initialBrightness = Settings.System.getInt(contentResolver,
                     Settings.System.SCREEN_BRIGHTNESS, -1)
                 if (preferences.initialBrightness < 0) error("Brightness unavailable")
-                if (preferences.initialBrightness >= 250) {
+                if (!TaskAvailability.experimental(this, selectedTask) && preferences.initialBrightness >= 250) {
                     AlertDialog.Builder(this).setTitle(c("屏幕亮度已接近最高", "光度已接近最高", "Brightness is near maximum"))
                         .setMessage(c("现在无法再明显调高亮度。请先在系统设置中调低亮度，之后再开始这项引导。", "而家冇办法再明显调光。请先喺系统设置调低光度，再开始呢项指引。", "There is little room to increase brightness. Lower it in Settings first, then start this guide."))
                         .setPositiveButton(c("知道了", "知道喇", "Got it"), null).show()
                     return
                 }
             } else if (selectedTask == GuideTask.FONT_SIZE) {
-                preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", 1f)
-                if (preferences.initialFontScale >= 1.99f) {
+                preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", resources.configuration.fontScale)
+                if (!TaskAvailability.experimental(this, selectedTask) && preferences.initialFontScale >= 1.99f) {
                     AlertDialog.Builder(this).setTitle(c("字体已经是最大一档", "字体已经最大喇", "Text is already at its largest"))
                         .setMessage(c("现在无法再把字调大。你可以去设置中按阅读习惯自行调整。", "而家冇办法再调大啲字。你可以去设置按自己习惯调整。", "The text cannot get larger. You can adjust it yourself in Settings."))
                         .setNegativeButton(c("返回", "返回", "Back"), null)
