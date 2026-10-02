@@ -16,6 +16,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
@@ -23,4 +26,6 @@ jobs:
       - name: Install Android SDK platform
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build and test
-        run: ./gradlew :guide:assembleDebug :demo-target:assembleDebug :guide:testDebugUnitTest :guide:lintDebug :demo-target:lintDebug
+        run: ./gradlew :guide:assembleDebug :guide:assembleRelease :guide:assembleDebugAndroidTest :demo-target:assembleDebug :guide:testDebugUnitTest :guide:lintDebug :demo-target:lintDebug
+      - name: Test bounded voice and intent proxy
+        run: python -m unittest discover -s scripts -p 'test_voice_proxy.py'

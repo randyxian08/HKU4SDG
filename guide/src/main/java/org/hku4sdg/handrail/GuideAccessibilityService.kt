@@ -34,6 +34,7 @@ class GuideAccessibilityService : AccessibilityService() {
     private var renderKey: String? = null
     private var hintVisible = false
     private var adjusting = false
+    private var toolsExpanded = false
     private var seenTaskWindow = false
     private var departureCheck: Runnable? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -98,6 +99,7 @@ class GuideAccessibilityService : AccessibilityService() {
         chromeSaveOffered = false
         hintVisible = false
         adjusting = false
+        toolsExpanded = false
         renderKey = null
     }
 
@@ -118,6 +120,7 @@ class GuideAccessibilityService : AccessibilityService() {
 
     private fun resumeGuide() {
         if (!preferences.active) return
+        if (TaskAvailability.block(this, preferences.activeTask) != null) { render(true); return }
         preferences.resume()
         resetTargets()
         render(true)
@@ -287,6 +290,18 @@ class GuideAccessibilityService : AccessibilityService() {
             return
         }
         seenTaskWindow = true
+        TaskAvailability.block(this, preferences.activeTask)?.let { block ->
+            preferences.pause(PauseReason.SYSTEM_INTERRUPT)
+            tts?.stop()
+            cloudTts?.stop()
+            val key = "blocked:$block:${preferences.textLanguage}"
+            if (!force && renderKey == key) return
+            resetTargets()
+            renderKey = key
+            overlay.showStatus(TaskAvailability.reason(block, preferences.textLanguage), preferences.textLanguage,
+                ::returnToTask, ::endGuide)
+            return
+        }
         if (preferences.sessionState.phase == SessionPhase.PAUSED) {
             tts?.stop()
             cloudTts?.stop()
@@ -331,7 +346,7 @@ class GuideAccessibilityService : AccessibilityService() {
             preferences.collapsed = preferences.helpMode == HelpMode.LIGHT
         }
         val bounds = node?.let { Rect().also(it::getBoundsInScreen) }
-        val key = "${preferences.activeTask}:$step:$bounds:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}:$hintVisible:$adjusting"
+        val key = "${preferences.activeTask}:$step:$bounds:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}:$hintVisible:$adjusting:$toolsExpanded"
         if (!force && key == renderKey) return
         shownStep = step
         renderKey = key
@@ -345,12 +360,14 @@ class GuideAccessibilityService : AccessibilityService() {
                 voiceLanguage = preferences.voiceLanguage,
                 collapsed = preferences.collapsed,
                 muted = preferences.muted,
+                toolsExpanded = toolsExpanded,
+                onTools = { toolsExpanded = !toolsExpanded; render(true) },
                 independent = preferences.helpMode == HelpMode.ON_DEMAND && !hintVisible,
                 adjusting = adjusting,
                 onCollapse = { preferences.collapsed = !preferences.collapsed; render(true) },
                 onTextLanguage = { preferences.textLanguage = next(preferences.textLanguage); render(true) },
                 onVoiceLanguage = { preferences.voiceLanguage = next(preferences.voiceLanguage); render(true) },
-                onReplay = { speak(step) },
+                onReplay = { speak(step, explicit = true) },
                 onPause = { pauseGuide(PauseReason.USER) },
                 onHint = { hintVisible = true; preferences.collapsed = false; render(true); speak(step) },
                 onConfirm = ::confirmGuide,
@@ -369,23 +386,26 @@ class GuideAccessibilityService : AccessibilityService() {
     private fun next(current: GuideLanguage): GuideLanguage =
         GuideLanguage.entries[(current.ordinal + 1) % GuideLanguage.entries.size]
 
-    private fun speak(step: GuideStep) {
-        if (preferences.muted || !preferences.sessionState.canConfirm) return
+    private fun speak(step: GuideStep, explicit: Boolean = false) {
+        if ((preferences.muted && !explicit) || !preferences.sessionState.canConfirm) return
         tts?.stop()
         val message = if (adjusting && !step.isScrollHint) ExperienceCopy.adjustment(step.task, preferences.voiceLanguage)
             else GuideContent.instruction(step, preferences.voiceLanguage)
         val language = preferences.voiceLanguage
-        cloudTts?.speak(message, language) { speakOnDevice(message, language) }
-            ?: speakOnDevice(message, language)
+        cloudTts?.speak(message, language) { speakOnDevice(message, language, explicit) }
+            ?: speakOnDevice(message, language, explicit)
     }
 
-    private fun speakOnDevice(message: String, language: GuideLanguage) {
-        if (preferences.muted || !ttsReady || !preferences.sessionState.canConfirm) return
+    private fun speakOnDevice(message: String, language: GuideLanguage, explicit: Boolean = false) {
+        if ((preferences.muted && !explicit) || !ttsReady || !preferences.sessionState.canConfirm) return
         val engine = tts ?: return
         val locale = language.locale
         val support = engine.isLanguageAvailable(locale)
         if (support < TextToSpeech.LANG_AVAILABLE || engine.setLanguage(locale) < TextToSpeech.LANG_AVAILABLE) {
-            Toast.makeText(this, "本机暂不支持 ${language.label} 播报，请查看文字提示。", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, ExperienceCopy.choose(preferences.textLanguage,
+                "本机暂不支持 ${language.label} 播报，请查看文字提示。",
+                "本机暂时未支持 ${language.label} 播报，请睇文字提示。",
+                "${language.label} speech is unavailable on this device. Use the text guidance."), Toast.LENGTH_LONG).show()
             return
         }
         engine.speak(message, TextToSpeech.QUEUE_FLUSH, null, "guide-${language.name}")
@@ -417,7 +437,19 @@ class GuideAccessibilityService : AccessibilityService() {
     }
 
     private fun confirmGuide() {
-        if (!preferences.sessionState.canConfirm) { render(true); return }
+        if (!preferences.sessionState.canConfirm || TaskAvailability.block(this, preferences.activeTask) != null) {
+            render(true); return
+        }
+        val root = rootInActiveWindow
+        if (root?.packageName?.toString() !in allowedPackages()) { clearFeedback(); return }
+        val current = when (preferences.activeTask) {
+            GuideTask.FONT_SIZE -> fontTarget(root)
+            GuideTask.SCREEN_BRIGHTNESS -> brightnessTarget(root)
+            GuideTask.CHROME_BOOKMARK -> chromeTarget(root)
+            GuideTask.MAPS_LIBRARY_ADDRESS -> mapsTarget(root)
+        }
+        if (current == null || (!current.first.isComplete && !(adjusting && current.first in
+                setOf(GuideStep.SLIDER, GuideStep.BRIGHTNESS_SLIDER)))) { render(true); return }
         preferences.finish(PracticeOutcome.CONFIRMED)
         endGuide()
         startActivity(Intent(this, MainActivity::class.java)
@@ -453,6 +485,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
         step: GuideStep, bounds: Rect?, message: String,
         textLanguage: GuideLanguage, voiceLanguage: GuideLanguage,
         collapsed: Boolean, muted: Boolean, independent: Boolean, adjusting: Boolean,
+        toolsExpanded: Boolean, onTools: () -> Unit,
         onCollapse: () -> Unit, onTextLanguage: () -> Unit, onVoiceLanguage: () -> Unit,
         onReplay: () -> Unit, onMute: () -> Unit, onExit: () -> Unit, onPause: () -> Unit,
         onHint: () -> Unit, onConfirm: () -> Unit, onAdjust: () -> Unit
@@ -490,7 +523,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
         }
         val number = SupportCopy.step(textLanguage, step.number, if (step.task == GuideTask.CHROME_BOOKMARK) 3 else 2)
         val eyebrow = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
-        eyebrow.addView(label("●  $number", 13f, Design.forest, true),
+        eyebrow.addView(label(number, 13f, Design.forest, true),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         if (!step.isScrollHint) eyebrow.addView(tap(SupportCopy.collapse(textLanguage, collapsed), Design.paleGreen,
             Design.forest, 13f, onCollapse))
@@ -500,31 +533,42 @@ private class GuideOverlay(private val service: AccessibilityService) {
             root.addView(label(SupportCopy.circled(textLanguage), 17f, Design.ink, true))
         } else {
             space(root, 15)
-            root.addView(label(message, 22f, Design.ink, true).apply {
+            root.addView(label(message, 21f, Design.ink, true).apply {
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
                 setLineSpacing(dp(4).toFloat(), 1f)
             })
-            space(root, 17)
-            val languages = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
-            languages.addView(tap("${SupportCopy.text(textLanguage)}  ${textLanguage.label}  ⌄", Design.paleGreen,
-                Design.forest, 14f, onTextLanguage), LinearLayout.LayoutParams(0, -2, 1f))
-            languages.addView(View(service), LinearLayout.LayoutParams(dp(8), 1))
-            languages.addView(tap("${SupportCopy.voice(textLanguage)}  ${voiceLanguage.label}  ⌄", Design.paleGreen,
-                Design.forest, 14f, onVoiceLanguage), LinearLayout.LayoutParams(0, -2, 1f))
-            root.addView(languages)
         }
-        space(root, 15)
+        space(root, 14)
         val actions = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
-        actions.addView(tap(SupportCopy.replay(textLanguage), Design.forest, Design.surface, 15f, onReplay),
-            LinearLayout.LayoutParams(0, -2, 1.3f))
-        actions.addView(View(service), LinearLayout.LayoutParams(dp(8), 1))
-        actions.addView(tap(SupportCopy.sound(textLanguage, muted), Design.background, Design.ink, 14f, onMute),
+        actions.addView(tap(if (muted) ExperienceCopy.choose(textLanguage, "听一次", "听一次", "Play once")
+            else SupportCopy.replay(textLanguage), Design.forest, Design.surface, 15f, onReplay),
             LinearLayout.LayoutParams(0, -2, 1f))
         actions.addView(View(service), LinearLayout.LayoutParams(dp(8), 1))
-        actions.addView(tap(ExperienceCopy.end(textLanguage), Design.background, Design.secondary, 14f, onExit),
-            LinearLayout.LayoutParams(0, -2, 0.7f))
+        actions.addView(tap(SupportCopy.pause(textLanguage), Design.paleGreen, Design.forest, 15f, onPause),
+            LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(actions)
-        space(root, 8)
-        root.addView(tap(SupportCopy.pause(textLanguage), Design.paleGreen, Design.forest, 15f, onPause))
+        space(root, 6)
+        val secondary = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
+        secondary.addView(tap(ExperienceCopy.choose(textLanguage, "语言和声音", "语言同声音", "Language & sound"),
+            Design.surface, Design.forest, 14f, onTools).apply {
+                contentDescription = ExperienceCopy.choose(textLanguage,
+                    "语言和声音，" + if (toolsExpanded) "已展开" else "已收起",
+                    "语言同声音，" + if (toolsExpanded) "已展开" else "已收起",
+                    "Language and sound, " + if (toolsExpanded) "expanded" else "collapsed")
+            }, LinearLayout.LayoutParams(0, -2, 1.5f))
+        secondary.addView(tap(ExperienceCopy.end(textLanguage), Design.surface, Design.secondary, 14f, onExit),
+            LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(secondary)
+        if (toolsExpanded) {
+            space(root, 8)
+            root.addView(tap("${SupportCopy.text(textLanguage)}: ${textLanguage.label}", Design.paleGreen,
+                Design.forest, 14f, onTextLanguage))
+            space(root, 6)
+            root.addView(tap("${SupportCopy.voice(textLanguage)}: ${voiceLanguage.label}", Design.paleGreen,
+                Design.forest, 14f, onVoiceLanguage))
+            space(root, 6)
+            root.addView(tap(SupportCopy.sound(textLanguage, muted), Design.background, Design.ink, 14f, onMute))
+        }
         if (adjusting) {
             space(root, 8)
             root.addView(tap(ExperienceCopy.confirm(textLanguage), Design.forest, Design.surface, 16f, onConfirm))
@@ -591,7 +635,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
                 info.className = android.widget.Button::class.java.name
             }
         }
-        background = Design.shape(fill, dp(13).toFloat())
+        background = Design.ripple(fill, dp(13).toFloat())
         setOnClickListener { click() }
     }
 
@@ -607,7 +651,7 @@ private class GuideOverlay(private val service: AccessibilityService) {
                 style = Paint.Style.STROKE
                 strokeWidth = dp(3).toFloat()
             }
-            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AE8783D }
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AC25825 }
             val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.orange }
             val badgeText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Design.surface

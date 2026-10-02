@@ -23,7 +23,7 @@ class CloudAsr(private val context: Context) {
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     @Volatile private var recording = false
-    private var generation = 0
+    @Volatile private var generation = 0
 
     fun start(language: GuideLanguage, onCaptured: () -> Unit, onResult: (String?) -> Unit): Boolean {
         if (!enabled || recording || context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return false
@@ -48,18 +48,18 @@ class CloudAsr(private val context: Context) {
             val audio = ByteArrayOutputStream()
             val chunk = ByteArray(6400)
             try {
-                while (recording && audio.size() < 256000) {
+                while (request == generation && recording && audio.size() < 256000) {
                     val count = recorder.read(chunk, 0, minOf(chunk.size, 256000 - audio.size()))
                     if (count <= 0) break
                     audio.write(chunk, 0, count)
                 }
             } finally {
-                recording = false
+                if (request == generation) recording = false
                 runCatching { recorder.stop() }
                 recorder.release()
             }
             main.post { if (request == generation) onCaptured() }
-            val transcript = if (audio.size() >= 16000) runCatching {
+            val transcript = if (request == generation && audio.size() >= 16000) runCatching {
                 transcribe(audio.toByteArray(), language)
             }.getOrNull() else null
             main.post { if (request == generation) onResult(transcript) }
@@ -69,9 +69,9 @@ class CloudAsr(private val context: Context) {
 
     fun stop() { recording = false }
     fun isRecording() = recording
+    fun cancel() { generation++; recording = false }
     fun close() {
-        recording = false
-        generation++
+        cancel()
         worker.shutdownNow()
     }
 

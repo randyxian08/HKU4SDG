@@ -13,6 +13,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "org.hku4sdg.handrail.AccessibilityCheck"
     }
 
     compileOptions {

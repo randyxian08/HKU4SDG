@@ -19,7 +19,7 @@ internal object Design {
     val secondary = 0xFF56645E.toInt()
     val forest = 0xFF17483E.toInt()
     val paleGreen = 0xFFE8F1EB.toInt()
-    val orange = 0xFFE8783D.toInt()
+    val orange = 0xFFC25825.toInt()
     val paleOrange = 0xFFFFEFE5.toInt()
     val line = 0xFFE4E8E1.toInt()
 
@@ -85,4 +85,19 @@ internal class HandrailMark(context: Context) : View(context) {
         canvas.drawCircle(w * 0.24f, h * 0.69f, context.dp(3).toFloat(), point)
         canvas.drawCircle(w * 0.76f, h * 0.30f, context.dp(3).toFloat(), point)
     }
+}
+
+/** Official Material round vectors, decorative when paired with a spoken label. */
+internal fun Context.icon(resource: Int, size: Int = 24, color: Int = Design.forest) =
+    android.widget.ImageView(this).apply {
+        setImageResource(resource)
+        imageTintList = ColorStateList.valueOf(color)
+        scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        minimumWidth = dp(size)
+        minimumHeight = dp(size)
+    }
+
+internal fun TextView.heading(): TextView = apply {
+    if (android.os.Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
 }

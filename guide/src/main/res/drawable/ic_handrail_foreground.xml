@@ -1,0 +1,7 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Existing HandrailMark brand asset, centered inside the adaptive icon safe area. -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="3" android:strokeLineCap="round"
+        android:strokeLineJoin="round" android:pathData="M34,69 L48,54 L57,54 L75,37"/>
+    <path android:fillColor="#FFB178" android:pathData="M34,69 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8 0 M75,37 m-4,0 a4,4 0,1 0,8 0 a4,4 0,1 0,-8 0"/>
+</vector>

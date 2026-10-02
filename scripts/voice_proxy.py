@@ -40,6 +40,10 @@ maps_library_address: find the address of Hong Kong Central Library in Google Ma
 The user must do the action themselves. Interpret Mandarin, Cantonese and English.
 Return match only for an unambiguous request to do one of these exact tasks. For
 chrome_bookmark, bookmarking, the elderly-services topic, and GovHK as the source must all be clear.
+Return clarify if the user clearly wants to save or revisit an elderly-services web page but
+has not identified its source, and has not named another website or app. Never assume GovHK.
+For font_size, device-wide words or letters described as too small or tiny are clear enough,
+even if the user does not explicitly say increase. Text inside a photo or another app is out of scope.
 For maps_library_address, both the exact Hong Kong Central Library and its address/location must be clear.
 Return clarify for vague readability requests that could mean brightness or font size.
 Return unsupported for directions, route navigation, opening hours, other libraries or addresses,

@@ -262,5 +262,47 @@
     "text": "Find the address of another library in Google Maps",
     "expected": "unsupported",
     "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "I cannot read the small words on my phone",
+    "expected": "match",
+    "expected_task_id": "font_size"
+  },
+  {
+    "language": "cantonese",
+    "text": "我想下次一撳就搵返個長者服務網頁",
+    "expected": "clarify",
+    "expected_task_id": ""
+  },
+  {
+    "language": "mandarin",
+    "text": "我想看看香港中央图书馆的地址",
+    "expected": "match",
+    "expected_task_id": "maps_library_address"
+  },
+  {
+    "language": "mandarin",
+    "text": "帮我调一下手机",
+    "expected": "clarify",
+    "expected_task_id": ""
+  },
+  {
+    "language": "english",
+    "text": "Send a WhatsApp message to my family",
+    "expected": "unsupported",
+    "expected_task_id": ""
+  },
+  {
+    "language": "cantonese",
+    "text": "幫我喺 Chrome 收藏政府一站通嘅長者服務網頁",
+    "expected": "match",
+    "expected_task_id": "chrome_bookmark"
+  },
+  {
+    "language": "english",
+    "text": "The words in this photo are tiny; enlarge the photo",
+    "expected": "unsupported",
+    "expected_task_id": ""
   }
 ]
