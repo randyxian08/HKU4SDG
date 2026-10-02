@@ -150,12 +150,15 @@ internal class GuideOverlay(private val service: AccessibilityService) {
             })
         }
     }
-    fun showStatus(message: String, l: GuideLanguage, onResume: () -> Unit, onExit: () -> Unit) {
+    fun showStatus(message: String, l: GuideLanguage, onResume: () -> Unit, onExit: () -> Unit, onDiagnostics: (() -> Unit)? = null) {
         clear(); val content = column(); val controls = column()
         content.addView(label(SupportCopy.unknown(l), 14f, Design.secondary, true))
         gap(content, 12); content.addView(label(message, 20f, bold = true))
         controls.addView(tap(SupportCopy.returnTask(l), Design.forest, Design.surface, onResume))
         gap(controls); controls.addView(tap(ExperienceCopy.end(l), Design.background, Design.secondary, onExit))
+        onDiagnostics?.let { copy ->
+            gap(controls); controls.addView(tap(c(l, "复制适配信息", "复制适配资料", "Copy compatibility info"), click = copy))
+        }
         showCard(content, controls, null, l)
     }
     fun showPaused(message: String, l: GuideLanguage, onResume: () -> Unit, onReturn: () -> Unit, onExit: () -> Unit) {

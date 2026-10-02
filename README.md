@@ -6,11 +6,11 @@
 
 用户只安装一个 `guide` APK。仓库中的 `demo-target` 是团队内部测试夹具，不是用户产品的安装前置条件。
 
-> 使用 `main` 获取当前实现并开始协作。本轮功能、截图与验证说明见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。
+> 四项演示基线见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。0.1.1 新增字体与亮度的手机实验引导；安装方法、中文页面截图和适用边界见[手机测试指南](docs/phone-testing.md)。
 
 ## 当前可以做什么
 
-当前演示设备是 **Android 15 / API 35、英文系统、`sdk_gphone64_arm64` 模拟器**。这就是本次黑客松的目标演示设备。任务目录按完整应用版本和环境检查可用性；版本不匹配、应用停用或页面无法核对时停止引导。
+四项任务的已审核演示设备是 **Android 15 / API 35、英文系统、`sdk_gphone64_arm64` 模拟器**。0.1.1 另允许 **Android 8–16 / API 26–36、中文或英文系统**尝试字体、亮度两项引导，首页标作“可试”。手机路径只在唯一识别到当前控件时圈画，无法核对时保留文字退路；这不代表已经逐机验收。Chrome、Maps 仍须符合原演示设备及完整应用版本。
 
 | 任务 | 用户亲手操作 | 应用检测的结果 |
 |---|---|---|
@@ -64,6 +64,8 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 
 ## 验证状态与适用边界
 
+0.1.1 手机实验版通过 28 项 Kotlin 单元测试、Debug／开发检查 APK 构建和 lint，并在 **API 35 模拟器的真实中文设置页面**完成字体、亮度、浮窗收起／换位／暂停恢复和脱敏适配信息检查。vivo X300s 尚未实测；API 36 准入使用合成设备参数验证。详见[手机测试记录](docs/phone-testing.md)。
+
 2026-10-02 功能提交 `b187343` 已通过 Debug、未签名 Release、开发检查 APK、18 项 Kotlin 单元测试、Android lint 及 [GitHub CI](https://github.com/randyxian08/HKU4SDG/actions/runs/36987251577)。1.0 字号字体任务与 2.0 字号亮度任务各完成 20 次原生浮窗操作检查；CI 不包含模拟器检查。
 
 [51 条合成三语开发样本](docs/intent-evaluation.md)中，方舟模型为 51/51，本地规则为 37/51，范围外误匹配均为 0；三语合成音频已通过 TTS→ASR 接口回归。这些不代表真人准确率、粤语音质或学习效果。
@@ -76,6 +78,7 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 
 - [产品体验方案](docs/product-experience.md)：单 App 的用户路径和功能优先级。
 - [开发接手指南](docs/development.md)：环境、模块、云端代理、测试和故障排查。
+- [手机测试指南](docs/phone-testing.md)：0.1.1 安装、字体／亮度实验引导及 vivo 测试注意点。
 - [可演示案例](docs/demo-cases.md)：四项场景、失败退路和演示口径。
 - [浮窗易用性走查](docs/overlay-usability.md)：最新改动、真实截图及验证边界。
 - [MVP 开发计划](docs/mvp-plan.md)：当前交付范围与可观察验收。

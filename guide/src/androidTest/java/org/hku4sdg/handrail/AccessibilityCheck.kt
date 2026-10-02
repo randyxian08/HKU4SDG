@@ -15,7 +15,9 @@ class AccessibilityCheck : Instrumentation() {
     private lateinit var automation: UiAutomation
     private val events = mutableListOf<String>()
     private var overlayTask: GuideTask? = null
+    private var phoneCheck = false
     override fun onCreate(arguments: Bundle?) {
+        phoneCheck = arguments?.getString("check") == "phone"
         if (arguments?.getString("check") == "overlay") overlayTask =
             if (arguments.getString("task") == "brightness") GuideTask.SCREEN_BRIGHTNESS else GuideTask.FONT_SIZE
         super.onCreate(arguments); start()
@@ -65,6 +67,7 @@ class AccessibilityCheck : Instrumentation() {
         }
     }
     override fun onStart() {
+        if (phoneCheck) { PhoneSettingsCheck(this).run(); return }
         overlayTask?.let { OverlayCheck(this, it).run(); return }
         val prefs = GuidePreferences(targetContext)
         val oldText = prefs.textLanguage

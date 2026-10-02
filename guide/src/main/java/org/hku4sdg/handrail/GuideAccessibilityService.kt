@@ -3,6 +3,9 @@ package org.hku4sdg.handrail
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.os.Build
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +15,8 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import org.json.JSONArray
+import org.json.JSONObject
 
 class GuideAccessibilityService : AccessibilityService() {
     private lateinit var preferences: GuidePreferences
@@ -29,6 +34,9 @@ class GuideAccessibilityService : AccessibilityService() {
     private var toolsExpanded = false
     private var endConfirming = false
     private var seenTaskWindow = false
+    private var phoneLabel = ""
+    private var phoneAtMaximum = false
+    private var phoneNodes: List<SettingsUiNode> = emptyList()
     private var departureCheck: Runnable? = null
     private val handler = Handler(Looper.getMainLooper())
 
@@ -84,6 +92,7 @@ class GuideAccessibilityService : AccessibilityService() {
         tts?.stop()
         cloudTts?.stop()
         renderKey = null
+        phoneNodes = emptyList()
     }
 
     private fun resetTargets() {
@@ -95,6 +104,9 @@ class GuideAccessibilityService : AccessibilityService() {
         toolsExpanded = false
         endConfirming = false
         renderKey = null
+        phoneLabel = ""
+        phoneAtMaximum = false
+        phoneNodes = emptyList()
     }
 
     private fun syncSession() {
@@ -176,7 +188,69 @@ class GuideAccessibilityService : AccessibilityService() {
         GuideTask.MAPS_LIBRARY_ADDRESS -> setOf(MAPS_PACKAGE)
     }
 
+    private fun phoneTarget(root: AccessibilityNodeInfo, task: GuideTask): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        if (root.packageName?.toString() !in if (task == GuideTask.FONT_SIZE) setOf(SETTINGS_PACKAGE)
+            else setOf(SETTINGS_PACKAGE, SYSTEMUI_PACKAGE)) return null
+        val live = mutableListOf<AccessibilityNodeInfo>()
+        val nodes = mutableListOf<SettingsUiNode>()
+        fun visit(node: AccessibilityNodeInfo, parent: Int) {
+            val index = live.size
+            val bounds = Rect().also(node::getBoundsInScreen)
+            live += node
+            nodes += SettingsUiNode(node.text?.toString().orEmpty(), node.contentDescription?.toString().orEmpty(),
+                node.viewIdResourceName.orEmpty(), parent, node.isVisibleToUser, node.isEnabled, node.isClickable,
+                node.className?.toString()?.contains("SeekBar", ignoreCase = true) == true ||
+                    node.actionList.any { it.id == AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id },
+                bounds.left, bounds.top, bounds.right, bounds.bottom)
+            repeat(node.childCount) { node.getChild(it)?.let { child -> visit(child, index) } }
+        }
+        visit(root, -1)
+        phoneNodes = nodes.map { it.copy(text = PhoneSettingsMatcher.safeLabel(it.text),
+            description = PhoneSettingsMatcher.safeLabel(it.description)) }
+        val match = if (task == GuideTask.FONT_SIZE) PhoneSettingsMatcher.font(nodes, resources.displayMetrics.density)
+            else PhoneSettingsMatcher.brightness(nodes, resources.displayMetrics.density)
+        phoneLabel = match?.label.orEmpty()
+        phoneAtMaximum = false
+        if (match == null) return null
+        if (!adjusting && match.controlPage) {
+            val increased = if (task == GuideTask.FONT_SIZE)
+                Settings.System.getFloat(contentResolver, FONT_SCALE_KEY, resources.configuration.fontScale) > preferences.initialFontScale + 0.01f
+                else Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1) > preferences.initialBrightness
+            if (increased) return (if (task == GuideTask.FONT_SIZE) GuideStep.COMPLETE else GuideStep.BRIGHTNESS_COMPLETE) to null
+        }
+        val target = match.index?.let(live::get)
+        target?.rangeInfo?.let { range -> phoneAtMaximum = range.max > range.min && range.current >= range.max }
+        return match.step to target
+    }
+
+    private fun copyPhoneDiagnostics() {
+        val root = rootInActiveWindow
+        if (!preferences.active || !TaskAvailability.experimental(this, preferences.activeTask) ||
+            root?.packageName?.toString() !in allowedPackages()) return
+        phoneTarget(root, preferences.activeTask)
+        val report = JSONObject().put("app_version", packageManager.getPackageInfo(packageName, 0).versionName)
+            .put("manufacturer", Build.MANUFACTURER).put("model", Build.MODEL).put("android_api", Build.VERSION.SDK_INT)
+            .put("system_language", resources.configuration.locales[0].toLanguageTag()).put("task", preferences.activeTask.id)
+            .put("package", root.packageName.toString()).put("node_count", phoneNodes.size)
+            .put("truncated", phoneNodes.size > 160)
+        val nodes = JSONArray()
+        phoneNodes.take(160).forEachIndexed { index, node ->
+            nodes.put(JSONObject().put("index", index).put("parent", node.parent).put("id", node.id)
+                .put("visible", node.visible).put("enabled", node.enabled).put("clickable", node.clickable)
+                .put("adjustable", node.adjustable).put("bounds", JSONArray(listOf(node.left, node.top, node.right, node.bottom)))
+                .put("label", PhoneSettingsMatcher.safeLabel(node.text))
+                .put("description", PhoneSettingsMatcher.safeLabel(node.description)))
+        }
+        report.put("nodes", nodes).put("scope", "Only known Settings labels and control structure; no other screen text, audio or identifiers")
+        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("数字扶手适配信息", report.toString()))
+        Toast.makeText(this, ExperienceCopy.choose(preferences.textLanguage,
+            "已复制控件结构和设备版本，不含其他页面文字。可粘贴到反馈中。",
+            "复制咗控件结构同设备版本，冇其他页面文字。可以贴到反馈入面。",
+            "Copied control structure and device version, without other page text. Paste it into your feedback."), Toast.LENGTH_LONG).show()
+    }
+
     private fun fontTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        if (TaskAvailability.experimental(this, GuideTask.FONT_SIZE)) return phoneTarget(root, GuideTask.FONT_SIZE)
         if (root.packageName?.toString() != SETTINGS_PACKAGE) return null
         return when {
             header(root, "Display size and text") -> {
@@ -198,6 +272,7 @@ class GuideAccessibilityService : AccessibilityService() {
     }
 
     private fun brightnessTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        if (TaskAvailability.experimental(this, GuideTask.SCREEN_BRIGHTNESS)) return phoneTarget(root, GuideTask.SCREEN_BRIGHTNESS)
         val initial = preferences.initialBrightness
         val current = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1)
         if (initial < 0 || current < 0) return null
@@ -319,7 +394,7 @@ class GuideAccessibilityService : AccessibilityService() {
             } catch (_: WindowManager.BadTokenException) { clearFeedback() }
             return
         }
-        // Strictly match only the tested Android 15 Settings, Chrome, or Maps layouts.
+        // Reviewed flows keep their exact selectors. Phone Settings require unique semantic controls.
         val target = when (preferences.activeTask) {
             GuideTask.FONT_SIZE -> fontTarget(root)
             GuideTask.SCREEN_BRIGHTNESS -> brightnessTarget(root)
@@ -334,8 +409,10 @@ class GuideAccessibilityService : AccessibilityService() {
             if (!force && renderKey == unknownKey) return
             renderKey = unknownKey
             try {
-                overlay.showStatus(GuideContent.unknown(preferences.textLanguage), preferences.textLanguage,
-                    onResume = ::returnToTask, onExit = ::requestEnd)
+                overlay.showStatus(if (TaskAvailability.experimental(this, preferences.activeTask))
+                    PhoneGuideCopy.unknown(preferences.activeTask, preferences.textLanguage) else GuideContent.unknown(preferences.textLanguage), preferences.textLanguage,
+                    onResume = ::returnToTask, onExit = ::requestEnd,
+                    onDiagnostics = if (TaskAvailability.experimental(this, preferences.activeTask)) ::copyPhoneDiagnostics else null)
             } catch (_: WindowManager.BadTokenException) {
                 overlay.clear()
                 renderKey = null
@@ -349,7 +426,7 @@ class GuideAccessibilityService : AccessibilityService() {
             preferences.collapsed = preferences.helpMode == HelpMode.LIGHT
         }
         val bounds = node?.let { Rect().also(it::getBoundsInScreen) }
-        val key = "${preferences.activeTask}:$step:$bounds:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}:$hintVisible:$adjusting:$toolsExpanded"
+        val key = "${preferences.activeTask}:$step:$bounds:$phoneLabel:$phoneAtMaximum:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}:$hintVisible:$adjusting:$toolsExpanded"
         if (!force && key == renderKey) return
         shownStep = step
         renderKey = key
@@ -358,7 +435,7 @@ class GuideAccessibilityService : AccessibilityService() {
                 step = step,
                 bounds = bounds,
                 message = if (adjusting && !step.isScrollHint) ExperienceCopy.adjustment(step.task, preferences.textLanguage)
-                    else GuideContent.instruction(step, preferences.textLanguage),
+                    else instruction(step, preferences.textLanguage),
                 textLanguage = preferences.textLanguage,
                 voiceLanguage = preferences.voiceLanguage,
                 collapsed = preferences.collapsed,
@@ -391,11 +468,17 @@ class GuideAccessibilityService : AccessibilityService() {
 
     private fun requestEnd() { endConfirming = true; render(true) }
 
+    private fun instruction(step: GuideStep, language: GuideLanguage): String =
+        if (TaskAvailability.experimental(this, step.task)) {
+            if (phoneAtMaximum && !step.isComplete && !step.isScrollHint) PhoneGuideCopy.atMaximum(step.task, language)
+            else PhoneGuideCopy.instruction(step, phoneLabel, language)
+        } else GuideContent.instruction(step, language)
+
     private fun speak(step: GuideStep, explicit: Boolean = false) {
         if ((preferences.muted && !explicit) || !preferences.sessionState.canConfirm) return
         tts?.stop()
         val message = if (adjusting && !step.isScrollHint) ExperienceCopy.adjustment(step.task, preferences.voiceLanguage)
-            else GuideContent.instruction(step, preferences.voiceLanguage)
+            else instruction(step, preferences.voiceLanguage)
         val language = preferences.voiceLanguage
         cloudTts?.speak(message, language) { speakOnDevice(message, language, explicit) }
             ?: speakOnDevice(message, language, explicit)
@@ -422,6 +505,7 @@ class GuideAccessibilityService : AccessibilityService() {
         chromeVerified = false
         chromeSaveOffered = false
         renderKey = null
+        phoneNodes = emptyList()
         tts?.stop()
         cloudTts?.stop()
         overlay.clear()

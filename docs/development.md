@@ -1,6 +1,6 @@
 # 数字扶手｜开发接手指南
 
-更新于 2026-10-02。本文以 `main` 为协作基准，帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。
+更新于 2026-10-03。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。0.1.1 手机实验路径见[手机测试指南](phone-testing.md)。
 
 ## 1. 获取当前实现
 
@@ -20,11 +20,12 @@ git switch main
 | Android SDK | Platform 35、Build Tools 35、Platform Tools |
 | 构建 | 仓库自带 Gradle Wrapper；Android Studio 可用于导入和运行模拟器 |
 | 运行目录 | 所有命令在仓库根目录执行 |
-| 任务准入 | API 35、`sdk_gphone64_arm64`、`ranchu` 或 `goldfish` 硬件、英文系统 |
+| 已审核演示准入 | API 35、`sdk_gphone64_arm64`、`ranchu` 或 `goldfish` 硬件、英文系统 |
+| 字体／亮度手机实验准入 | API 26–36、中文或英文系统、系统设置应用已启用；不限制手机型号 |
 | 第三方应用 | Chrome `124.0.6367.219`、Maps `11.129.0103` |
 | 可选云端代理 | Python、[requirements-voice.txt](../scripts/requirements-voice.txt)、本机开发密钥 |
 
-`minSdk = 26` 只表示安装下限；任务目录的运行支持范围仍限定上述演示环境。新增设备、语言或应用版本，须先重新核对页面和失败行为，再更新 [TaskCatalog.kt](../guide/src/main/java/org/hku4sdg/handrail/TaskCatalog.kt)，不能只放宽版本判断。
+`minSdk = 26` 表示安装下限。字体／亮度手机实验路径还会逐页核对唯一语义控件，并在未知页面撤圈；准入通过不等于设备验收。Chrome、Maps 继续限定原演示环境。新增设备或应用版本时，需要保存实际页面与失败行为证据，不能只放宽版本判断。
 
 ```bash
 source scripts/dev-env.sh
@@ -67,6 +68,7 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 | [MainActivity.kt](../guide/src/main/java/org/hku4sdg/handrail/MainActivity.kt) | 首页、任务确认、权限引导、语言设置、语音输入与练习记录 |
 | [TaskCatalog.kt](../guide/src/main/java/org/hku4sdg/handrail/TaskCatalog.kt)、[TaskAvailability.kt](../guide/src/main/java/org/hku4sdg/handrail/TaskAvailability.kt) | 已审核任务及设备、语言、安装状态、完整版本准入 |
 | [GuideAccessibilityService.kt](../guide/src/main/java/org/hku4sdg/handrail/GuideAccessibilityService.kt) | 实时页面／控件核对、结果检测、中断处理与播报触发 |
+| [PhoneSettingsMatcher.kt](../guide/src/main/java/org/hku4sdg/handrail/PhoneSettingsMatcher.kt)、[PhoneGuideCopy.kt](../guide/src/main/java/org/hku4sdg/handrail/PhoneGuideCopy.kt) | 手机字体／亮度的唯一控件识别、实验说明、未知页退路和适配信息标签白名单 |
 | [GuideOverlay.kt](../guide/src/main/java/org/hku4sdg/handrail/GuideOverlay.kt)、[OverlayPlacement.kt](../guide/src/main/java/org/hku4sdg/handrail/OverlayPlacement.kt) | 不接收触控的圈画、可操作卡片、收起与固定操作、目标避让 |
 | [GuideContent.kt](../guide/src/main/java/org/hku4sdg/handrail/GuideContent.kt)、[SessionState.kt](../guide/src/main/java/org/hku4sdg/handrail/SessionState.kt)、[Practice.kt](../guide/src/main/java/org/hku4sdg/handrail/Practice.kt) | 固定三语步骤、偏好、活动／暂停状态与本机记录 |
 | [Design.kt](../guide/src/main/java/org/hku4sdg/handrail/Design.kt)、`*Copy.kt` | 视觉样式及页面／恢复／帮助文案 |

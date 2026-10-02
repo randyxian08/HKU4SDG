@@ -1,0 +1,12 @@
+Digital Handrail 0.1.1 phone-settings regression
+Android 15 / API 35; sdk_gphone64_arm64 emulator; real zh-Hans-CN system pages
+Not a vivo, Android 16 runtime, voice or TalkBack acceptance test.
+Debug build, androidTest build, 28 Kotlin unit tests and lint passed.
+
+Waiting up to 10 seconds for the guide service rebind
+
+PASS
+Phone overlay collapse + move + pause/resume keep the same attempt
+Chinese Settings font row + actual slider + system value increase + user confirmation
+Chinese Settings brightness row + actual slider + value increase + user confirmation
+Unknown Settings page: no circled target; explicit redacted compatibility export
