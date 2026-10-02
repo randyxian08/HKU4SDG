@@ -1,0 +1,34 @@
+# 数字扶手｜文档导航
+
+更新于 2026-10-02。当前实现位于 `codex/android-mvp-foundation`，通过 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6) 提出合并申请，截至该日期尚未合并到 `main`。产品是一个原生 Android App，用户只安装 `guide`；当前运行范围是已审核的 Android 15 英文系统模拟器及指定 Chrome、Maps 版本。
+
+## 按需要阅读
+
+| 你要做什么 | 从这里开始 | 文档性质 |
+|---|---|---|
+| 了解产品与安装方式 | [仓库 README](../README.md) | 当前功能、快速运行与适用边界 |
+| 接手开发或运行检查 | [开发接手指南](development.md) | 当前目录、配置、命令和排查 |
+| 准备演示与案例讲述 | [可演示案例](demo-cases.md) | 已测场景与演示脚本；不是真人试用结果 |
+| 看最新浮窗及操作证据 | [浮窗易用性走查](overlay-usability.md) | 本轮实际截图、修复与 1.0/2.0 字号日志 |
+| 看完整页面与四项任务回归 | [界面与端到端验收](uiux-validation.md) | 全应用三语、任务准入和运行证据 |
+| 看首次权限与中断恢复 | [首次设置与中断恢复](setup-recovery.md) | 已实现路径、截图和验收条件 |
+| 看 AI 相对本地规则的证据 | [意图识别验收](intent-evaluation.md) | 当前 51 条合成开发集与早期 44 条历史对照 |
+| 分配下一轮工作 | [MVP 计划](mvp-plan.md)、[下一阶段顺序](next-sprint.md) | 当前状态与规划；日期较早的节点保留历史依据 |
+
+## 产品与设计依据
+
+- [产品体验方案](product-experience.md)：信息架构、帮助方式和功能优先级。
+- [产品质量迭代](product-quality.md)：完成确认、继续调整、帮助选择与本机记录。
+- [界面研究与改版依据](design-research.md)：Apple、Android、OpenAI、Anthropic 的资料和本项目选择。
+- [火山引擎语音选型](volcengine-voice-research.md)：语音、AI 接入判断及尚未验证部分。
+- [产品界面历史](interface.md)：历次运行截图与条件；最新排版以浮窗和端到端验收报告为准。
+
+## 使用证据时
+
+每份截图、日志或对照只证明其注明的设备、版本、语言、任务与日期。云端接口返回音频／文字不等于真人语音体验通过；平台无障碍操作检查不等于完整 TalkBack 验收；用户确认完成也不等于已经学会。
+
+当前浮窗检查日志位于 [1 倍字号](validation/overlay-1x-2026-10-02.txt)与 [2 倍字号](validation/overlay-2x-2026-10-02.txt)，合成尝试摘要位于[记录摘要](validation/overlay-attempts-2026-10-02.json)。AI 逐条对照见[2026-10-02 JSON](intent-evaluation-2026-10-02.json)。
+
+## 协作与产品资料
+
+[CONTRIBUTING.md](../CONTRIBUTING.md)规定认领、PR 验证说明与同伴审阅。实现和验证结果保存在仓库；[飞书产品定义](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)和[飞书进度与案例](https://my.feishu.cn/wiki/NIqHwHf98iIjqektf8KcHtdanZg)用于产品讨论与进度同步。修改需求、完成条件或支持范围时，同时更新对应实现、文档和证据。

@@ -1,47 +1,84 @@
 # 数字扶手｜HKU4SDG
 
-数字扶手是一款 Android 指导应用：用户说出目标或选择任务，确认后亲手完成操作；应用只在已审核的页面圈出当前目标，并提供可折叠文字和可选语音。遇到无法确认的页面会停止圈画。
+**你自己动手，我们陪你走下一步。**
 
-**交给用户的是一个 App、一个 APK：`guide`。** 仓库中的 `demo-target` 是早期跨应用机制的内部测试夹具，不属于用户产品，也不是使用数字扶手的前置安装条件。旧模拟练习截图只记录技术测试，不是当前产品演示。
+数字扶手是一款面向手机操作求助场景的原生 Android 应用。用户选择任务或说出目标，确认后进入真实系统设置或第三方应用；数字扶手圈出当前一步，提供可折叠文字和可选语音，用户亲手点击、拖动，最后确认结果。
 
-## 目前能实际演示什么
+用户只安装一个 `guide` APK。仓库中的 `demo-target` 是团队内部测试夹具，不是用户产品的安装前置条件。
 
-在 Android 15 / Pixel 7 模拟器上有四项真实任务：两项英文系统设置任务“把字调大”“调高屏幕亮度”，在 Chrome 124 收藏 [GovHK 长者服务公开网页](https://www.gov.hk/tc/residents/housing/socialservices/elderly/index.htm)，以及在 Google Maps 11.129 查看[香港中央图书馆](https://www.hkpl.gov.hk/tc/locations/central-library/central.html)地址。前两项分别以系统 `font_scale`、`SCREEN_BRIGHTNESS` 的实际增加检测结果；Chrome 任务以显示 `Edit bookmark` 检测收藏结果；Maps 任务以指定地点的地址行出现检测展示结果，之后均等待用户确认，不提供路线导航。离开已识别页面会撤下圈画；不认识的页面停止指引。模拟器截图见 [产品界面与验证记录](docs/interface.md)。
+> 当前功能开发分支：`codex/android-mvp-foundation`，见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。截至 2026-10-02，该 PR 尚未合并到 `main`。以下能力和截图对应此开发分支。
 
-2026-10-02 已补齐完成后的闭环：检测到结果后等待用户亲自确认，字体和亮度可继续调整；开始前可选完整指引、轻提示或自己先试试。按需模式通过“给我提示”恢复当前一步，换步后重新由用户决定；本机保留最近 20 次可删除的练习记录，区分确认完成与未确认退出。大字体把设置目标挤出视口时，会先提示用户滚动，控件可见后再圈画。验收范围和下一轮产品选择见[产品质量迭代](docs/product-quality.md)。
+## 当前可以做什么
 
-输入语言、引导文字与 AI 提示、语音播报语言可分别选择普通话、粤语和英语；首页、任务、记录、设置和引导控件已跟随所选文字语言。Debug 模拟器版已加入**受约束的真实 AI 意图识别**：用户主动提交的目标文字只可映射到上述四项已审核任务、请求澄清或拒绝；模型不决定跨应用位置和步骤。2026-10-02 方舟 Mini 模型在 [51 条固定三语样本](docs/intent-evaluation.md)上为 51/51，本地规则为 37/51，范围外误匹配均为 0；这不是面向真实用户的准确率。服务不可用时回退到保守的本地匹配。语音输入的 Debug 模拟器路径已接入火山引擎 ASR，三语合成音频均返回转写；模拟器自身麦克风的真人三语识别与粤语音质尚未验收。本次黑客松以该模拟器为演示设备；当前只适配上述模拟器的已测页面，不应视为任意第三方 App、其他 Android 品牌或版本均可用。
+当前演示设备是 **Android 15 / API 35、英文系统、`sdk_gphone64_arm64` 模拟器**。这就是本次黑客松的目标演示设备。任务目录按完整应用版本和环境检查可用性；版本不匹配、应用停用或页面无法核对时停止引导。
 
-产品定义来自 [飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)。四项可讲述的用户场景及失败路径见[可演示案例](docs/demo-cases.md)；单 App 的信息架构与功能优先级见 [产品体验方案](docs/product-experience.md)；Apple、Android、OpenAI 和 Anthropic 官方资料与本次界面决定见 [界面研究与改版依据](docs/design-research.md)；火山引擎的语音与 AI 接入判断见 [语音选型](docs/volcengine-voice-research.md)；近期功能和比赛节点见 [下一阶段推进顺序](docs/next-sprint.md)；模拟器演示验收见 [MVP 开发计划](docs/mvp-plan.md)。
+| 任务 | 用户亲手操作 | 应用检测的结果 |
+|---|---|---|
+| 把字调大 | 在真实系统设置打开 `Display size and text`，拖动 `Font size` | 系统 `font_scale` 增加，再询问是否适合阅读 |
+| 调亮屏幕 | 在真实系统设置打开 `Brightness level`，拖动亮度滑杆 | 手动亮度值增加，再询问是否合适 |
+| 收藏长者服务网页 | 在 Chrome **124.0.6367.219** 的指定 GovHK 页面操作书签 | 检测 `Edit bookmark`，等待用户确认；已有书签也可核验 |
+| 查图书馆地址 | 在 Google Maps **11.129.0103** 展开香港中央图书馆地点卡 | 指定地址行出现，等待用户确认看到了地址 |
 
-2026-10-02 进一步加入首次设置与任务恢复：权限未开时保留原任务和帮助选择；离开目标应用、主动暂停、服务重连或应用重启后，等待用户继续并重新识别页面。暂停不记成完成，恢复沿用原尝试；重新开始才创建新尝试。求助控件、首次设置和恢复页跟随三种文字语言。截图、操作录像入口和验收范围见[首次设置与中断恢复](docs/setup-recovery.md)。
+地图任务只查看指定地点的地址，不提供路线导航。所有任务都由用户操作；未知页面撤圈，AI 不替用户点击、输入或提交。
 
-2026-10-02 完成界面与三语改版：首页使用四行任务列表，任务页固定返回和开始入口，语言、声音设置收进浮层次级操作。已登记每项任务的审核版本；目标 App 未启用或版本不匹配时不能开始。1.0 与 2.0 字号下，无障碍焦点、按钮角色、48dp 触控目标和点击检查通过；这不代表完整 TalkBack 手势／朗读顺序或用户研究通过。完整截图和回归证据见[界面与端到端验收](docs/uiux-validation.md)。
+### 已实现的体验
 
-2026-10-02 进一步优化浮窗：收起后保留文字恢复入口、播放、暂停和换位置；提示内容可滚动，主要操作固定。位置避让按完整目标控件和系统边界计算，优先显示完整指令；语言改为直接选择，结束前可以取消。两组 1.0/2.0 字号原生操作检查通过。实际截图、发现的问题和验证限制见[浮窗易用性走查](docs/overlay-usability.md)。
+- **三项独立语言设置**：输入、界面文字／AI 提示、语音播报分别选择普通话、粤语和英语。
+- **三档帮助**：完整指引、轻提示、自己先试试；按需请求当前一步提示。
+- **浮窗**：文字默认展开，可收起、恢复、换位置；播放与暂停固定，语言直接选择，结束前可以取消。位置避开当前目标，另一侧放不下完整指令时保留可读位置。
+- **首次设置与中断恢复**：保留任务和帮助选择，暂停／继续沿用同一次尝试，恢复时重新识别页面。
+- **结果确认与记录**：字体和亮度可继续调整；确认后保存结果，本机最多保留 20 次可删除记录，区分确认与未确认结束。
+- **受约束 AI 与语音**：Debug 模拟器可经本机代理使用方舟意图识别、火山 ASR 与 TTS。模型只选择四项已审核任务、澄清或拒绝，密钥留在宿主机。代理不可用时保留本地匹配、设备播报或文字／任务卡退路。
 
-## 本地运行
+## 实际界面
 
-需要 Android Studio、Android SDK Platform 35、Build Tools 35、Platform Tools 和 JDK 17。连接已允许 USB 调试的设备或运行模拟器后：
+以下来自当前模拟器运行，含首页、2 倍字体收起浮窗及真实 Maps 地址确认。
+
+<p>
+  <img src="docs/screenshots/android15-oct2c-home.png" width="240" alt="数字扶手首页：四项任务及文字、语音输入" />
+  <img src="docs/screenshots/android15-oct2d-overlay-compact-2x.png" width="240" alt="2 倍字体下的收起浮窗，目标保持可点击" />
+  <img src="docs/screenshots/android15-oct2d-maps-result.png" width="240" alt="真实 Google Maps 地址行圈画及用户确认" />
+</p>
+
+更多截图与逐项证据见[浮窗走查](docs/overlay-usability.md)和[界面与端到端验收](docs/uiux-validation.md)。
+
+## 快速运行
+
+需要 JDK 17、Android SDK Platform 35、Build Tools 35、Platform Tools，以及上述演示模拟器。`scripts/dev-env.sh` 默认使用 macOS SDK 路径；其他环境须先设置自己的 `ANDROID_HOME` 与 `JAVA_HOME`。
+
+在仓库根目录执行：
 
 ```bash
+git switch codex/android-mvp-foundation
 source scripts/dev-env.sh
+adb devices
 ./gradlew :guide:assembleDebug :guide:testDebugUnitTest :guide:lintDebug
 ./scripts/install-app.sh
+adb shell am start -n org.hku4sdg.handrail/.MainActivity
 ```
 
-打开数字扶手，选择任务和帮助方式。服务未开启时，应用会说明权限用途并带用户进入系统无障碍设置；用户须亲手开启“数字扶手 · 手机引导”，用返回键回到应用，再确认任务开始。亮度演示需先把系统亮度设在未达最大值、关闭自动亮度的状态。Chrome 演示限定已测公开网页和 Chrome 124 布局；Maps 演示限定香港中央图书馆地点卡和 Maps 11.129 布局。语音输入首次使用时会说明录音去向；拒绝麦克风后仍可用文字和任务卡。
+选择任务和帮助方式。首次使用须在系统无障碍设置中亲手开启“数字扶手 · 手机引导”，返回应用后再确认开始。字体任务起始字号须未达到上限；亮度任务须关闭自动亮度且起始值未达到上限。语音拒绝或不可用时，仍可使用文字与任务卡。
 
-团队如需回归早期模拟流程，可用 `scripts/install-demo.sh` 安装内部测试夹具。这个脚本不用于对外演示或用户安装说明。
+不配置云端密钥也可演示任务卡与跨应用引导。云端语音／AI 的本机设置、构建产物、回归命令及排查方式见[开发接手指南](docs/development.md)。
 
-## 开发版在线播报
+## 验证状态与适用边界
 
-Android 15 模拟器上的 Debug APK 会尝试连接宿主机 `127.0.0.1:8765` 的本地语音代理（模拟器内地址为 `10.0.2.2`）。代理使用已开通的火山引擎 TTS 2.0 / Vivi 2.0；普通话、英语和粤语分别配置语种或粤语模式。服务密钥只在宿主机进程中使用，不放进 APK 或 Git。若代理未运行或接口失败，App 会退回设备 TTS，文字卡照常保留。
+2026-10-02 功能提交 `b187343` 已通过 Debug、未签名 Release、开发检查 APK、18 项 Kotlin 单元测试、Android lint 及 [GitHub CI](https://github.com/randyxian08/HKU4SDG/actions/runs/36987251577)。1.0 字号字体任务与 2.0 字号亮度任务各完成 20 次原生浮窗操作检查；CI 不包含模拟器检查。
 
-本机启动方式：复制 `.env.example` 为被 Git 忽略的 `.env`，只在本机填入 `VOLCENGINE_API_KEY` 和仅允许访问方舟 Mini 模型的 `ARK_API_KEY`。运行 `python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements-voice.txt`，再运行 `set -a; source .env; set +a; SSL_CERT_FILE=/etc/ssl/cert.pem .venv/bin/python scripts/voice_proxy.py`。本机 Homebrew Python 需要指定系统证书库；其他环境若默认 HTTPS 验证正常，可省略 `SSL_CERT_FILE`。检查 `curl http://127.0.0.1:8765/health` 中 `ready`、`intent_ready` 和 `asr_ready`。进入已审核步骤或点击“再听一遍”时，固定引导文字会送到语音接口；用户点“说话”后录音、点“停止”或 8 秒到时，PCM 才经本机代理送到火山 ASR，识别文字先放入可编辑输入框；只有再点“查找引导”提交目标时，目标文字才会送到方舟意图接口。代理只监听宿主机回环地址，Debug 模拟器构建才允许本地 HTTP；正式构建仍使用 Android 设备识别服务。
-代理每次启动最多处理 100 次、合计 5,000 字符的演示请求，达到上限即拒绝并由 App 回退到本机播报。这个本机上限不替代控制台的实际免费额度和账单检查。
-意图接口另设每次启动最多 60 次请求的上限，ASR 最多 30 次、每次最多 8 秒。意图接口只接收最多 160 字的目标文字和输入语言，返回 `match`、`clarify` 或 `unsupported`；仅四项已审核任务可选。结构化返回还会在本机按允许列表验证，出错时退回保守的本地规则或任务卡。固定三语评测集与真实模型对照见[意图识别验收](docs/intent-evaluation.md)。
+[51 条合成三语开发样本](docs/intent-evaluation.md)中，方舟模型为 51/51，本地规则为 37/51，范围外误匹配均为 0；三语合成音频已通过 TTS→ASR 接口回归。这些不代表真人准确率、粤语音质或学习效果。
 
-## 一起协作
+尚未验收完整 TalkBack 手势／朗读顺序、真人三语审听、非团队成员试用、稍后独立重做、任意 App 或其他设备。第三方页面加载初期的未识别反馈仍需优化。仓库里标作规划的功能不应当作已交付能力。
 
-功能、设计、研究和文案讨论可开 Issue。认领前写清目标、预期产物和验收方式；提交 Pull Request 时附上实际验证与未验证部分。约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。不要提交真实用户的录音、截图、身份资料、密钥或服务凭据。
+## 文档与协作
+
+从[文档导航](docs/README.md)选择产品、开发、演示或验证入口：
+
+- [产品体验方案](docs/product-experience.md)：单 App 的用户路径和功能优先级。
+- [开发接手指南](docs/development.md)：环境、模块、云端代理、测试和故障排查。
+- [可演示案例](docs/demo-cases.md)：四项场景、失败退路和演示口径。
+- [浮窗易用性走查](docs/overlay-usability.md)：最新改动、真实截图及验证边界。
+- [MVP 开发计划](docs/mvp-plan.md)：当前交付范围与可观察验收。
+
+认领工作、提交 PR 和合并要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。PR 需说明实际验证和未验证部分；合并前由至少一位同伴审阅。不要提交密钥、`.env`、真实用户录音、身份资料或敏感截图。
+
+[飞书产品定义](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg) · [飞书进度与案例](https://my.feishu.cn/wiki/NIqHwHf98iIjqektf8KcHtdanZg)

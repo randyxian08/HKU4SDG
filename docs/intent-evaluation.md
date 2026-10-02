@@ -19,11 +19,15 @@
 
 ## 固定对照与继续条件
 
-[`scripts/intent_cases.json`](../scripts/intent_cases.json)包含 44 条虚构、无个人资料的普通话／粤语／英语测试句：19 条明确支持、3 条应澄清、22 条范围外或对抗表达。新增 3 条中央图书馆地址表达及 6 条路线、开放时间、其他地点等反例。正确结果必须同时匹配决策和任务 ID，不能只看是否返回 `match`。`python3 scripts/evaluate_intent.py` 只运行本地退路；配置独立 `ARK_API_KEY` 后用 `python3 scripts/evaluate_intent.py --live` 调真实模型。两者在**同一批文本**上比较准确决策、错误匹配、支持任务召回与延迟，并保留逐条失败案例。
+[`scripts/intent_cases.json`](../scripts/intent_cases.json)当前包含 51 条虚构、无个人资料的普通话／粤语／英语测试句：22 条明确支持、5 条应澄清、24 条范围外或对抗表达。早期 44 条集的结果保留在下方历史记录中。正确结果必须同时匹配决策和任务 ID，不能只看是否返回 `match`。`python3 scripts/evaluate_intent.py` 只运行本地退路；配置独立 `ARK_API_KEY` 后用 `python3 scripts/evaluate_intent.py --live` 调真实模型。两者在**同一批文本**上比较准确决策、错误匹配、支持任务召回与延迟，并保留逐条失败案例。
 
-2026-09-28 同一批 44 条样本：本地退路 33/44 完全一致，支持任务 11/19，范围外请求错误匹配 0；方舟真实模型 44/44 完全一致，支持任务 19/19，范围外请求错误匹配 0，单次响应中位数 1.96 秒。模型把 3 条模糊句识别为应澄清；本地退路不能澄清，因而拒绝。这只是团队编写的小型合成集，不代表真实长者表达或统计意义上的准确率。逐条 JSON 输出保存在本机被 Git 忽略的 `captures/intent-eval-four-tasks.json`，可用上述命令复现。
+### 早期 44 条对照（2026-09-28）
+
+2026-09-28 同一批 44 条样本：本地退路 33/44 完全一致，支持任务 11/19，范围外请求错误匹配 0；方舟真实模型 44/44 完全一致，支持任务 19/19，范围外请求错误匹配 0，单次响应中位数 1.96 秒。模型把 3 条模糊句识别为应澄清；本地退路不能澄清，因而拒绝。这只是团队编写的小型合成集，不代表真实长者表达或统计意义上的准确率。历史逐条 JSON 输出保存在本机被 Git 忽略的 `captures/intent-eval-four-tasks.json`。当前命令使用扩充后的 51 条集；复现早期结果须使用当时的测试集与模型配置。
 
 在 Android 15 / Pixel 7 模拟器上，英文请求 `Make the system text larger` 经真实模型进入[字体任务确认页](screenshots/android15-ai-intent-match.png)；`Make the screen brighter` 进入[亮度任务确认页](screenshots/android15-brightness-ai-match.png)，然后由用户在真实设置里完成[圈画与亮度调节](interface.md)。模糊请求 `Can you make the screen easier to read` [显示澄清](screenshots/android15-ai-intent-clarify.png)；范围外请求 `Send a text message` [显示暂不支持](screenshots/android15-ai-intent-unsupported.png)。这验证了输入到回复/任务页的演示链路，**没有**验证真实老人的理解程度、模型遇到所有隐私描述时的安全性，或未审核的跨应用任务。
+
+### 继续验证的范围
 
 下一次扩大样本时，范围外请求仍应**错误匹配为 0**；若出现错误，先收紧允许范围并重测。还需用不含个人资料的真实表达进行盲测，记录网络错误、慢响应和各语言的样本分母。结构化输出是接口约束，不能代替本机结果验证或用户确认。四个任务都只能覆盖已测模拟器路径；亮度处于最大值、自动亮度开启、Chrome/Maps 改版及其他系统皮肤还未验收。
 
