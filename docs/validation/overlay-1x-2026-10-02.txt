@@ -1,0 +1,32 @@
+PASS
+click + role + >=48dp: 把字调大.
+click + role + >=48dp: 打开设置，开始
+card clear of Display size and text: Rect(32, 168 - 1049, 785)
+click + role + >=48dp: 收起提示
+card clear of Display size and text: Rect(32, 168 - 1049, 531)
+compact 363px < expanded 617px
+click + role + >=48dp: 换个位置
+card clear of Display size and text: Rect(32, 168 - 1049, 531)
+click + role + >=48dp: 查看本步文字
+card clear of Display size and text: Rect(32, 168 - 1049, 785)
+click + role + >=48dp: 更多
+Replay and pause remain fixed while options scroll
+click + role + >=48dp: 文字 · 普通话
+click + role + >=48dp: English
+click + role + >=48dp: Text · English
+click + role + >=48dp: 粤语
+click + role + >=48dp: 文字 · 粤语
+click + role + >=48dp: 普通话
+Direct language selection; input and voice unchanged
+click + role + >=48dp: 结束，不确认
+click + role + >=48dp: 继续这次任务
+click + role + >=48dp: 换个位置
+card clear of Display size and text: Rect(32, 168 - 1049, 1248)
+Moving preserves the full primary instruction; compact card can also move
+click + role + >=48dp: 先停一下
+click + role + >=48dp: 继续指引
+card clear of Display size and text: Rect(32, 168 - 1049, 785)
+click + role + >=48dp: 更多
+click + role + >=48dp: 结束，不确认
+click + role + >=48dp: 结束引导
+Cancel end, pause and resume preserve the same attempt; explicit exit records one unconfirmed result

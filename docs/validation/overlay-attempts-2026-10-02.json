@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-02",
+  "device": "Android 15 API 35 emulator",
+  "attempts": [
+    {
+      "session": 47,
+      "task": "maps_library_address",
+      "help": "FULL",
+      "outcome": "CONFIRMED"
+    },
+    {
+      "session": 46,
+      "task": "chrome_bookmark",
+      "help": "FULL",
+      "outcome": "CONFIRMED"
+    },
+    {
+      "session": 45,
+      "task": "font_size",
+      "help": "FULL",
+      "outcome": "CONFIRMED"
+    },
+    {
+      "session": 44,
+      "task": "screen_brightness",
+      "help": "FULL",
+      "outcome": "ENDED"
+    },
+    {
+      "session": 43,
+      "task": "font_size",
+      "help": "FULL",
+      "outcome": "ENDED"
+    },
+    {
+      "session": 39,
+      "task": "font_size",
+      "help": "FULL",
+      "outcome": "CONFIRMED"
+    }
+  ],
+  "scope": "Synthetic local demo attempts; no user study or learning outcome."
+}
