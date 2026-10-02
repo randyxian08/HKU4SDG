@@ -14,7 +14,12 @@ import java.io.File
 class AccessibilityCheck : Instrumentation() {
     private lateinit var automation: UiAutomation
     private val events = mutableListOf<String>()
-    override fun onCreate(arguments: Bundle?) { super.onCreate(arguments); start() }
+    private var overlayTask: GuideTask? = null
+    override fun onCreate(arguments: Bundle?) {
+        if (arguments?.getString("check") == "overlay") overlayTask =
+            if (arguments.getString("task") == "brightness") GuideTask.SCREEN_BRIGHTNESS else GuideTask.FONT_SIZE
+        super.onCreate(arguments); start()
+    }
     private fun nodes(root: AccessibilityNodeInfo?): List<AccessibilityNodeInfo> = buildList {
         if (root != null) { add(root); repeat(root.childCount) { addAll(nodes(root.getChild(it))) } }
     }
@@ -60,6 +65,7 @@ class AccessibilityCheck : Instrumentation() {
         }
     }
     override fun onStart() {
+        overlayTask?.let { OverlayCheck(this, it).run(); return }
         val prefs = GuidePreferences(targetContext)
         val oldText = prefs.textLanguage
         val input = prefs.inputLanguage

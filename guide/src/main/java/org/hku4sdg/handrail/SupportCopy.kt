@@ -7,6 +7,7 @@ object SupportCopy {
     fun resume(l: GuideLanguage) = c(l, "继续指引", "继续指引", "Continue guide")
     fun paused(l: GuideLanguage) = c(l, "指引已暂停", "指引已暂停", "Guide paused")
     fun pauseMessage(reason: PauseReason?, l: GuideLanguage) = when (reason) {
+        PauseReason.NOT_ENOUGH_SPACE -> c(l, "提示会挡住目标，已暂停圈画。请先在卡片外滚动页面，再点继续重新检查。", "提示会遮住目标，圈画暂停咗。请喺卡外扫动页面，再㩒继续检查。", "The card would cover the target, so highlighting is paused. Scroll outside the card, then continue to check again.")
         PauseReason.USER -> c(l, "先歇一会儿。圈画和播报已停止；想继续时，点下面的按钮。", "抖一阵先。圈画同播报停咗；想继续就㩒下面嘅掣。", "Take a break. Highlights and speech have stopped. Continue when you are ready.")
         PauseReason.LEFT_APP -> c(l, "刚才离开了任务页面。点继续后，我们会重新确认当前页面。", "头先离开咗任务页面。㩒继续之后，我哋会重新确认而家嘅页面。", "You left the task page. Continue to check this page again.")
         else -> c(l, "引导服务刚才中断了。任务还保留着，点继续后重新确认页面。", "指引服务头先中断咗。任务仲喺度，㩒继续后重新确认页面。", "The guide was interrupted. Your task is saved. Continue to check the page again.")

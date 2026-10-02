@@ -135,9 +135,9 @@ object GuideContent {
     }
 
     fun unknown(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "无法确认当前页面，已停止圈画。请返回数字扶手重新开始。"
-        GuideLanguage.CANTONESE -> "确认唔到而家嘅頁面，已经停止圈畫。请返数字扶手重新开始。"
-        GuideLanguage.ENGLISH -> "This page is not recognized. Highlighting has stopped. Return to Digital Handrail and start again."
+        GuideLanguage.MANDARIN -> "无法确认当前页面，已停止圈画。回到刚才的页面后会重新核对，也可以返回任务。"
+        GuideLanguage.CANTONESE -> "确认唔到而家嘅页面，圈画停咗。返到头先嘅页面会重新检查，亦可以返任务。"
+        GuideLanguage.ENGLISH -> "This page is not recognized. Highlighting has stopped. Go back to the previous page to check again, or return to the task."
     }
 }
 

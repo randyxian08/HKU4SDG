@@ -1,9 +1,6 @@
 package org.hku4sdg.handrail
 
 import android.accessibilityservice.AccessibilityService
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.content.Intent
 import android.content.res.Configuration
@@ -11,14 +8,9 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
-import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.ScrollView
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 
 class GuideAccessibilityService : AccessibilityService() {
@@ -35,6 +27,7 @@ class GuideAccessibilityService : AccessibilityService() {
     private var hintVisible = false
     private var adjusting = false
     private var toolsExpanded = false
+    private var endConfirming = false
     private var seenTaskWindow = false
     private var departureCheck: Runnable? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -100,12 +93,14 @@ class GuideAccessibilityService : AccessibilityService() {
         hintVisible = false
         adjusting = false
         toolsExpanded = false
+        endConfirming = false
         renderKey = null
     }
 
     private fun syncSession() {
         if (currentSessionId != preferences.guideSessionId) {
             currentSessionId = preferences.guideSessionId
+            overlay.resetPosition()
             resetTargets()
             seenTaskWindow = false
         }
@@ -290,6 +285,14 @@ class GuideAccessibilityService : AccessibilityService() {
             return
         }
         seenTaskWindow = true
+        if (endConfirming) {
+            tts?.stop(); cloudTts?.stop()
+            if (!force && renderKey == "end-confirm") return
+            renderKey = "end-confirm"
+            overlay.showExitConfirmation(preferences.textLanguage,
+                { endConfirming = false; render(true) }, ::endGuide)
+            return
+        }
         TaskAvailability.block(this, preferences.activeTask)?.let { block ->
             preferences.pause(PauseReason.SYSTEM_INTERRUPT)
             tts?.stop()
@@ -299,7 +302,7 @@ class GuideAccessibilityService : AccessibilityService() {
             resetTargets()
             renderKey = key
             overlay.showStatus(TaskAvailability.reason(block, preferences.textLanguage), preferences.textLanguage,
-                ::returnToTask, ::endGuide)
+                ::returnToTask, ::requestEnd)
             return
         }
         if (preferences.sessionState.phase == SessionPhase.PAUSED) {
@@ -312,7 +315,7 @@ class GuideAccessibilityService : AccessibilityService() {
             renderKey = key
             try {
                 overlay.showPaused(SupportCopy.pauseMessage(preferences.sessionState.reason, l), l,
-                    ::resumeGuide, ::openRecovery, ::endGuide)
+                    ::resumeGuide, ::openRecovery, ::requestEnd)
             } catch (_: WindowManager.BadTokenException) { clearFeedback() }
             return
         }
@@ -332,7 +335,7 @@ class GuideAccessibilityService : AccessibilityService() {
             renderKey = unknownKey
             try {
                 overlay.showStatus(GuideContent.unknown(preferences.textLanguage), preferences.textLanguage,
-                    onResume = ::returnToTask, onExit = ::endGuide)
+                    onResume = ::returnToTask, onExit = ::requestEnd)
             } catch (_: WindowManager.BadTokenException) {
                 overlay.clear()
                 renderKey = null
@@ -362,18 +365,21 @@ class GuideAccessibilityService : AccessibilityService() {
                 muted = preferences.muted,
                 toolsExpanded = toolsExpanded,
                 onTools = { toolsExpanded = !toolsExpanded; render(true) },
+                onRefresh = { render(true) },
+                onMove = { overlay.move(); render(true) },
+                onUnavailable = { pauseGuide(PauseReason.NOT_ENOUGH_SPACE) },
                 independent = preferences.helpMode == HelpMode.ON_DEMAND && !hintVisible,
                 adjusting = adjusting,
                 onCollapse = { preferences.collapsed = !preferences.collapsed; render(true) },
-                onTextLanguage = { preferences.textLanguage = next(preferences.textLanguage); render(true) },
-                onVoiceLanguage = { preferences.voiceLanguage = next(preferences.voiceLanguage); render(true) },
+                onTextLanguage = { language -> preferences.textLanguage = language; render(true) },
+                onVoiceLanguage = { language -> preferences.voiceLanguage = language; render(true) },
                 onReplay = { speak(step, explicit = true) },
                 onPause = { pauseGuide(PauseReason.USER) },
                 onHint = { hintVisible = true; preferences.collapsed = false; render(true); speak(step) },
                 onConfirm = ::confirmGuide,
                 onAdjust = { adjusting = true; renderKey = null; render(true) },
                 onMute = { preferences.muted = !preferences.muted; if (preferences.muted) { tts?.stop(); cloudTts?.stop() }; render(true) },
-                onExit = ::endGuide
+                onExit = ::requestEnd
             )
         } catch (_: WindowManager.BadTokenException) {
             overlay.clear()
@@ -383,8 +389,7 @@ class GuideAccessibilityService : AccessibilityService() {
         if (changedStep && !step.isComplete && preferences.helpMode == HelpMode.FULL) speak(step)
     }
 
-    private fun next(current: GuideLanguage): GuideLanguage =
-        GuideLanguage.entries[(current.ordinal + 1) % GuideLanguage.entries.size]
+    private fun requestEnd() { endConfirming = true; render(true) }
 
     private fun speak(step: GuideStep, explicit: Boolean = false) {
         if ((preferences.muted && !explicit) || !preferences.sessionState.canConfirm) return
@@ -464,261 +469,5 @@ class GuideAccessibilityService : AccessibilityService() {
         private const val CHROME_PACKAGE = "com.android.chrome"
         private const val MAPS_PACKAGE = "com.google.android.apps.maps"
         private const val FONT_SCALE_KEY = "font_scale"
-    }
-}
-
-/** Two small accessibility windows: a non-touchable highlight and a touchable card. */
-private class GuideOverlay(private val service: AccessibilityService) {
-    private val wm = service.getSystemService(WindowManager::class.java)
-    private var ring: View? = null
-    private var card: View? = null
-    private fun dp(value: Int) = (value * service.resources.displayMetrics.density).toInt()
-
-    fun clear() {
-        ring?.let { runCatching { wm.removeViewImmediate(it) } }
-        card?.let { runCatching { wm.removeViewImmediate(it) } }
-        ring = null
-        card = null
-    }
-
-    fun showStep(
-        step: GuideStep, bounds: Rect?, message: String,
-        textLanguage: GuideLanguage, voiceLanguage: GuideLanguage,
-        collapsed: Boolean, muted: Boolean, independent: Boolean, adjusting: Boolean,
-        toolsExpanded: Boolean, onTools: () -> Unit,
-        onCollapse: () -> Unit, onTextLanguage: () -> Unit, onVoiceLanguage: () -> Unit,
-        onReplay: () -> Unit, onMute: () -> Unit, onExit: () -> Unit, onPause: () -> Unit,
-        onHint: () -> Unit, onConfirm: () -> Unit, onAdjust: () -> Unit
-    ) {
-        clear()
-        if (bounds != null && (!independent || adjusting || step.isComplete)) addRing(bounds, step)
-        val root = cardBase()
-        if (step.isComplete) {
-            root.addView(label(ExperienceCopy.status(textLanguage), 13f, Design.forest, true))
-            space(root, 12)
-            root.addView(label(ExperienceCopy.question(step.task, textLanguage), 22f, Design.ink, true))
-            space(root, 12)
-            root.addView(tap(ExperienceCopy.confirm(textLanguage), Design.forest, Design.surface, 16f, onConfirm))
-            if (step.task in setOf(GuideTask.FONT_SIZE, GuideTask.SCREEN_BRIGHTNESS)) {
-                space(root, 8)
-                root.addView(tap(ExperienceCopy.adjust(textLanguage), Design.paleGreen, Design.forest, 16f, onAdjust))
-            }
-            space(root, 6)
-            root.addView(tap(SupportCopy.pause(textLanguage), Design.paleGreen, Design.forest, 15f, onPause))
-            space(root, 6)
-            root.addView(tap(ExperienceCopy.unconfirmed(textLanguage), Design.background, Design.secondary, 14f, onExit))
-            addCard(root, bounds)
-            return
-        }
-        if (independent && !adjusting) {
-            root.addView(label(ExperienceCopy.own(textLanguage), 18f, Design.ink, true))
-            space(root, 12)
-            root.addView(tap(ExperienceCopy.hint(textLanguage), Design.forest, Design.surface, 16f, onHint))
-            space(root, 6)
-            root.addView(tap(SupportCopy.pause(textLanguage), Design.paleGreen, Design.forest, 15f, onPause))
-            space(root, 6)
-            root.addView(tap(ExperienceCopy.end(textLanguage), Design.background, Design.secondary, 14f, onExit))
-            addCard(root, bounds)
-            return
-        }
-        val number = SupportCopy.step(textLanguage, step.number, if (step.task == GuideTask.CHROME_BOOKMARK) 3 else 2)
-        val eyebrow = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
-        eyebrow.addView(label(number, 13f, Design.forest, true),
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        if (!step.isScrollHint) eyebrow.addView(tap(SupportCopy.collapse(textLanguage, collapsed), Design.paleGreen,
-            Design.forest, 13f, onCollapse))
-        root.addView(eyebrow)
-        if (collapsed && !step.isScrollHint) {
-            space(root, 9)
-            root.addView(label(SupportCopy.circled(textLanguage), 17f, Design.ink, true))
-        } else {
-            space(root, 15)
-            root.addView(label(message, 21f, Design.ink, true).apply {
-                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-                setLineSpacing(dp(4).toFloat(), 1f)
-            })
-        }
-        space(root, 14)
-        val actions = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
-        actions.addView(tap(if (muted) ExperienceCopy.choose(textLanguage, "听一次", "听一次", "Play once")
-            else SupportCopy.replay(textLanguage), Design.forest, Design.surface, 15f, onReplay),
-            LinearLayout.LayoutParams(0, -2, 1f))
-        actions.addView(View(service), LinearLayout.LayoutParams(dp(8), 1))
-        actions.addView(tap(SupportCopy.pause(textLanguage), Design.paleGreen, Design.forest, 15f, onPause),
-            LinearLayout.LayoutParams(0, -2, 1f))
-        root.addView(actions)
-        space(root, 6)
-        val secondary = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
-        secondary.addView(tap(ExperienceCopy.choose(textLanguage, "语言和声音", "语言同声音", "Language & sound"),
-            Design.surface, Design.forest, 14f, onTools).apply {
-                contentDescription = ExperienceCopy.choose(textLanguage,
-                    "语言和声音，" + if (toolsExpanded) "已展开" else "已收起",
-                    "语言同声音，" + if (toolsExpanded) "已展开" else "已收起",
-                    "Language and sound, " + if (toolsExpanded) "expanded" else "collapsed")
-            }, LinearLayout.LayoutParams(0, -2, 1.5f))
-        secondary.addView(tap(ExperienceCopy.end(textLanguage), Design.surface, Design.secondary, 14f, onExit),
-            LinearLayout.LayoutParams(0, -2, 1f))
-        root.addView(secondary)
-        if (toolsExpanded) {
-            space(root, 8)
-            root.addView(tap("${SupportCopy.text(textLanguage)}: ${textLanguage.label}", Design.paleGreen,
-                Design.forest, 14f, onTextLanguage))
-            space(root, 6)
-            root.addView(tap("${SupportCopy.voice(textLanguage)}: ${voiceLanguage.label}", Design.paleGreen,
-                Design.forest, 14f, onVoiceLanguage))
-            space(root, 6)
-            root.addView(tap(SupportCopy.sound(textLanguage, muted), Design.background, Design.ink, 14f, onMute))
-        }
-        if (adjusting) {
-            space(root, 8)
-            root.addView(tap(ExperienceCopy.confirm(textLanguage), Design.forest, Design.surface, 16f, onConfirm))
-        }
-        addCard(root, bounds)
-    }
-
-    fun showStatus(message: String, language: GuideLanguage, onResume: () -> Unit, onExit: () -> Unit) {
-        clear()
-        val root = cardBase()
-        root.addView(label(SupportCopy.unknown(language), 13f, Design.secondary, true))
-        space(root, 13)
-        root.addView(label(message, 20f, Design.ink, true).apply { setLineSpacing(dp(4).toFloat(), 1f) })
-        space(root, 18)
-        root.addView(tap(ExperienceCopy.returnTask(language), Design.forest, Design.surface, 16f, onResume))
-        space(root, 8)
-        root.addView(tap(ExperienceCopy.end(language), Design.background, Design.ink, 15f, onExit))
-        addCard(root, null)
-    }
-
-    fun showPaused(message: String, language: GuideLanguage, onResume: () -> Unit,
-        onReturn: () -> Unit, onExit: () -> Unit) {
-        clear()
-        val root = cardBase()
-        root.addView(label(SupportCopy.paused(language), 14f, Design.forest, true))
-        space(root, 13)
-        root.addView(label(message, 20f, Design.ink, true))
-        space(root, 18)
-        root.addView(tap(SupportCopy.resume(language), Design.forest, Design.surface, 16f, onResume))
-        space(root, 8)
-        root.addView(tap(SupportCopy.returnTask(language), Design.paleGreen, Design.forest, 15f, onReturn))
-        space(root, 8)
-        root.addView(tap(ExperienceCopy.unconfirmed(language), Design.background, Design.secondary, 14f, onExit))
-        addCard(root, null)
-    }
-
-    private fun cardBase() = LinearLayout(service).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(20), dp(18), dp(20), dp(20))
-        background = Design.shape(Design.surface, dp(26).toFloat(), Design.line, dp(1))
-    }
-
-    private fun label(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(service).apply {
-        text = value
-        textSize = size
-        setTextColor(color)
-        includeFontPadding = false
-        if (bold) typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-    }
-
-    private fun tap(value: String, fill: Int, color: Int, size: Float, click: () -> Unit) = TextView(service).apply {
-        text = value
-        textSize = size
-        setTextColor(color)
-        gravity = Gravity.CENTER
-        includeFontPadding = false
-        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-        setPadding(dp(8), dp(8), dp(8), dp(8))
-        minHeight = dp(48)
-        isFocusable = true
-        accessibilityDelegate = object : View.AccessibilityDelegate() {
-            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
-                super.onInitializeAccessibilityNodeInfo(host, info)
-                info.className = android.widget.Button::class.java.name
-            }
-        }
-        background = Design.ripple(fill, dp(13).toFloat())
-        setOnClickListener { click() }
-    }
-
-    private fun space(parent: LinearLayout, height: Int) {
-        parent.addView(View(service), LinearLayout.LayoutParams(1, dp(height)))
-    }
-
-    private fun addRing(bounds: Rect, step: GuideStep) {
-        val padding = dp(15)
-        val view = object : View(service) {
-            val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Design.orange
-                style = Paint.Style.STROKE
-                strokeWidth = dp(3).toFloat()
-            }
-            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AC25825 }
-            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.orange }
-            val badgeText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Design.surface
-                textSize = dp(13).toFloat()
-                textAlign = Paint.Align.CENTER
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-            }
-            override fun onDraw(canvas: Canvas) {
-                super.onDraw(canvas)
-                val left = padding.toFloat()
-                val top = padding.toFloat()
-                val right = (width - padding).toFloat()
-                val bottom = (height - padding).toFloat()
-                canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), fill)
-                canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), stroke)
-                if (!step.isComplete) {
-                    canvas.drawCircle(left, top, dp(14).toFloat(), badge)
-                    canvas.drawText(step.number.toString(), left, top - (badgeText.ascent() + badgeText.descent()) / 2, badgeText)
-                }
-            }
-        }
-        view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        val screenWidth = service.resources.displayMetrics.widthPixels
-        val screenHeight = service.resources.displayMetrics.heightPixels
-        val margin = dp(6)
-        val ringWidth = (bounds.width() + padding * 2).coerceAtMost(screenWidth - margin * 2)
-        val ringHeight = (bounds.height() + padding * 2).coerceAtMost(screenHeight - margin * 2)
-        val params = WindowManager.LayoutParams(ringWidth, ringHeight,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = (bounds.left - padding).coerceIn(margin, screenWidth - ringWidth - margin)
-            y = (bounds.top - padding).coerceIn(margin, screenHeight - ringHeight - margin)
-        }
-        wm.addView(view, params)
-        ring = view
-    }
-
-    private fun addCard(view: View, bounds: Rect?) {
-        val width = service.resources.displayMetrics.widthPixels - dp(32)
-        view.measure(
-            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        )
-        val screenHeight = service.resources.displayMetrics.heightPixels
-        val above = if (bounds == null) 0 else (bounds.top - dp(80)).coerceAtLeast(0)
-        val below = if (bounds == null) screenHeight - dp(120) else (screenHeight - bounds.bottom - dp(56)).coerceAtLeast(0)
-        val atBottom = bounds == null || below >= view.measuredHeight || below >= above
-        val available = (if (atBottom) below else above).coerceAtLeast(dp(100))
-        val height = view.measuredHeight.coerceAtMost(available)
-        val scroll = ScrollView(service).apply {
-            background = Design.shape(Design.surface, dp(26).toFloat(), Design.line, dp(1))
-            clipToOutline = true
-            addView(view)
-            isFillViewport = false
-        }
-        val params = WindowManager.LayoutParams(width, height,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT).apply {
-            gravity = (if (atBottom) Gravity.BOTTOM else Gravity.TOP) or Gravity.START
-            x = dp(16)
-            y = dp(if (atBottom) 24 else 64)
-        }
-        wm.addView(scroll, params)
-        card = scroll
     }
 }

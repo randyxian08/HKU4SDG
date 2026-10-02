@@ -1,6 +1,6 @@
 package org.hku4sdg.handrail
 
-enum class PauseReason { USER, LEFT_APP, SERVICE_RESTART, SYSTEM_INTERRUPT }
+enum class PauseReason { USER, LEFT_APP, SERVICE_RESTART, SYSTEM_INTERRUPT, NOT_ENOUGH_SPACE }
 enum class SessionPhase { IDLE, RUNNING, PAUSED }
 
 /** A paused attempt remains the same attempt; only an explicit resume can run it again. */
