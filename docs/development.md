@@ -1,16 +1,16 @@
 # 数字扶手｜开发接手指南
 
-更新于 2026-10-02。本文对应当前 `codex/android-mvp-foundation` 分支，帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。
+更新于 2026-10-02。本文以 `main` 为协作基准，帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。
 
 ## 1. 获取当前实现
 
 ```bash
 git clone https://github.com/randyxian08/HKU4SDG.git
 cd HKU4SDG
-git switch codex/android-mvp-foundation
+git switch main
 ```
 
-已有 checkout 时先检查 `git status`，保留自己的未提交工作，再拉取该分支。当前开发 PR 为 [#6](https://github.com/randyxian08/HKU4SDG/pull/6)。认领和审阅约定见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
+已有 checkout 时先检查 `git status`，保留自己的未提交工作，再切换到 `main` 并执行 `git pull --ff-only origin main`。本轮功能和验证说明见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。认领和审阅约定见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 
 ## 2. 环境与演示条件
 

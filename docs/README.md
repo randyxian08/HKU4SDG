@@ -1,6 +1,6 @@
 # 数字扶手｜文档导航
 
-更新于 2026-10-02。当前实现位于 `codex/android-mvp-foundation`，通过 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6) 提出合并申请，截至该日期尚未合并到 `main`。产品是一个原生 Android App，用户只安装 `guide`；当前运行范围是已审核的 Android 15 英文系统模拟器及指定 Chrome、Maps 版本。
+更新于 2026-10-02。使用 `main` 获取当前实现；本轮功能和验证说明见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。产品是一个原生 Android App，用户只安装 `guide`；当前运行范围是已审核的 Android 15 英文系统模拟器及指定 Chrome、Maps 版本。
 
 ## 按需要阅读
 

@@ -6,7 +6,7 @@
 
 用户只安装一个 `guide` APK。仓库中的 `demo-target` 是团队内部测试夹具，不是用户产品的安装前置条件。
 
-> 当前功能开发分支：`codex/android-mvp-foundation`，见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。截至 2026-10-02，该 PR 尚未合并到 `main`。以下能力和截图对应此开发分支。
+> 使用 `main` 获取当前实现并开始协作。本轮功能、截图与验证说明见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。
 
 ## 当前可以做什么
 
@@ -49,7 +49,8 @@
 在仓库根目录执行：
 
 ```bash
-git switch codex/android-mvp-foundation
+git switch main
+git pull --ff-only origin main
 source scripts/dev-env.sh
 adb devices
 ./gradlew :guide:assembleDebug :guide:testDebugUnitTest :guide:lintDebug
