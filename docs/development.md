@@ -144,6 +144,8 @@ python3 -m unittest discover -s scripts -p 'test_voice_proxy.py'
 
 CI 配置见 [android.yml](../.github/workflows/android.yml)。代理单元测试使用模拟接口响应，不代表真实语音服务通过。Kotlin 报告位于 `guide/build/reports/tests/testDebugUnitTest/`，lint 报告位于 `guide/build/reports/lint-results-debug.html`。
 
+仅改动 Markdown 文件或 `docs/` 下的文档、截图和验证记录时，push 与 pull request 不触发 Android 构建。源码、Gradle、代理脚本及工作流改动仍触发构建；同一工作流和引用上的新运行会取消旧运行。需要检查纯文档修订时，可在 GitHub Actions 中手动运行 `Android build`。
+
 ### 模拟器界面与浮窗
 
 平台操作检查与 CI 构建分开运行。先结束活动引导，安装 Debug 与开发检查 APK；保持数字扶手服务启用。完整页面的焦点／角色检查复现方式见[界面验收](uiux-validation.md)。浮窗检查使用同一 runner：
