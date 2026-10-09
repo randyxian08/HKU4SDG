@@ -33,9 +33,6 @@ class GuideAccessibilityService : AccessibilityService() {
     private var adjusting = false
     private var toolsExpanded = false
     private var endConfirming = false
-    private var ackReady = false
-    private var stepShownAt = 0L
-    private var doneToken = 0
     private var seenTaskWindow = false
     private var phoneLabel = ""
     private var phoneAtMaximum = false
@@ -70,44 +67,11 @@ class GuideAccessibilityService : AccessibilityService() {
             }
             return
         }
-        val before = shownStep
         render()
         handler.postDelayed({ if (preferences.active) render() }, 250)
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             handler.postDelayed({ if (preferences.active) render() }, 750)
         }
-        armDone(event?.eventType ?: 0, before)
-    }
-
-    private fun armDone(type: Int, before: GuideStep?) {
-        val step = before ?: return
-        if (step != shownStep || step.isScrollHint || step.isComplete || ackReady) return
-        val age = android.os.SystemClock.uptimeMillis() - stepShownAt
-        val arm = when (step) {
-            GuideStep.SLIDER, GuideStep.BRIGHTNESS_SLIDER ->
-                (type == AccessibilityEvent.TYPE_VIEW_CLICKED && age > 600) ||
-                    (type == AccessibilityEvent.TYPE_VIEW_SCROLLED && age > 1500)
-            else -> type == AccessibilityEvent.TYPE_VIEW_CLICKED && age > 600
-        }
-        if (!arm) return
-        ackReady = true
-        render(true)
-    }
-
-    private fun scheduleDone(step: GuideStep) {
-        doneToken += 1
-        val token = doneToken
-        if (step != GuideStep.SLIDER && step != GuideStep.BRIGHTNESS_SLIDER) return
-        handler.postDelayed({
-            if (token != doneToken || shownStep != step || ackReady) return@postDelayed
-            ackReady = true
-            render(true)
-        }, 12_000)
-    }
-
-    private fun doneLabel(step: GuideStep): String {
-        val last = step.isComplete || step == GuideStep.SLIDER || step == GuideStep.BRIGHTNESS_SLIDER
-        return ExperienceCopy.choose(preferences.textLanguage, if (last) "完成" else "好了", if (last) "完成" else "好了", "Done")
     }
 
     private fun checkDeparture() {
@@ -139,8 +103,6 @@ class GuideAccessibilityService : AccessibilityService() {
         adjusting = false
         toolsExpanded = false
         endConfirming = false
-        ackReady = false
-        doneToken += 1
         renderKey = null
         phoneLabel = ""
         phoneAtMaximum = false
@@ -464,13 +426,9 @@ class GuideAccessibilityService : AccessibilityService() {
         if (changedStep) {
             hintVisible = false
             preferences.collapsed = preferences.helpMode == HelpMode.LIGHT
-            ackReady = step.isComplete
-            stepShownAt = android.os.SystemClock.uptimeMillis()
-            scheduleDone(step)
         }
         val bounds = node?.let { Rect().also(it::getBoundsInScreen) }
-        val showDone = ackReady || step.isComplete
-        val key = "${preferences.activeTask}:$step:$bounds:$phoneLabel:$phoneAtMaximum:${preferences.textLanguage}:$showDone"
+        val key = "${preferences.activeTask}:$step:$bounds:$phoneLabel:$phoneAtMaximum:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}:$hintVisible:$adjusting:$toolsExpanded"
         if (!force && key == renderKey) return
         shownStep = step
         renderKey = key
@@ -478,23 +436,36 @@ class GuideAccessibilityService : AccessibilityService() {
             overlay.showStep(
                 step = step,
                 bounds = bounds,
-                message = instruction(step, preferences.textLanguage),
+                message = if (adjusting && !step.isScrollHint) ExperienceCopy.adjustment(step.task, preferences.textLanguage)
+                    else instruction(step, preferences.textLanguage),
                 textLanguage = preferences.textLanguage,
-                showDone = showDone,
-                doneLabel = doneLabel(step),
-                onDone = {
-                    val current = shownStep
-                    if (current != null && (current.isComplete || current == GuideStep.SLIDER || current == GuideStep.BRIGHTNESS_SLIDER)) confirmGuide()
-                    else render(true)
-                },
-                onUnavailable = { pauseGuide(PauseReason.NOT_ENOUGH_SPACE) }
+                voiceLanguage = preferences.voiceLanguage,
+                collapsed = preferences.collapsed,
+                muted = preferences.muted,
+                toolsExpanded = toolsExpanded,
+                onTools = { toolsExpanded = !toolsExpanded; render(true) },
+                onRefresh = { render(true) },
+                onMove = { overlay.move(); render(true) },
+                onUnavailable = { pauseGuide(PauseReason.NOT_ENOUGH_SPACE) },
+                independent = preferences.helpMode == HelpMode.ON_DEMAND && !hintVisible,
+                adjusting = adjusting,
+                onCollapse = { preferences.collapsed = !preferences.collapsed; toolsExpanded = false; render(true) },
+                onTextLanguage = { language -> preferences.textLanguage = language; render(true) },
+                onVoiceLanguage = { language -> preferences.voiceLanguage = language; render(true) },
+                onReplay = { speak(step, explicit = true) },
+                onPause = { pauseGuide(PauseReason.USER) },
+                onHint = { hintVisible = true; preferences.collapsed = false; render(true); speak(step) },
+                onConfirm = ::confirmGuide,
+                onAdjust = { adjusting = true; renderKey = null; render(true) },
+                onMute = { preferences.muted = !preferences.muted; if (preferences.muted) { tts?.stop(); cloudTts?.stop() }; render(true) },
+                onExit = ::requestEnd
             )
         } catch (_: WindowManager.BadTokenException) {
             overlay.clear()
             renderKey = null
             return
         }
-        if (changedStep && !showDone && !preferences.muted) speak(step)
+        if (changedStep && !step.isComplete && preferences.helpMode == HelpMode.FULL) speak(step)
     }
 
     private fun requestEnd() { endConfirming = true; render(true) }
@@ -568,8 +539,8 @@ class GuideAccessibilityService : AccessibilityService() {
             GuideTask.CHROME_BOOKMARK -> chromeTarget(root)
             GuideTask.MAPS_LIBRARY_ADDRESS -> mapsTarget(root)
         }
-        if (current == null || (!current.first.isComplete && current.first != GuideStep.SLIDER &&
-                current.first != GuideStep.BRIGHTNESS_SLIDER)) { render(true); return }
+        if (current == null || (!current.first.isComplete && !(adjusting && current.first in
+                setOf(GuideStep.SLIDER, GuideStep.BRIGHTNESS_SLIDER)))) { render(true); return }
         preferences.finish(PracticeOutcome.CONFIRMED)
         endGuide()
         startActivity(Intent(this, MainActivity::class.java)

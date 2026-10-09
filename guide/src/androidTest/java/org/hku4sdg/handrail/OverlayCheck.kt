@@ -90,11 +90,12 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
     }
     fun run() {
         prefs = GuidePreferences(targetContext)
-        val text = prefs.textLanguage; val mute = prefs.muted
+        val snapshot = PreferenceSnapshot(targetContext)
         var code = Activity.RESULT_CANCELED; val result = Bundle()
         try {
             check(!prefs.active) { "End the current guide before checking overlays" }
             prefs.textLanguage = GuideLanguage.MANDARIN; prefs.muted = true
+            prefs.initDone = true; prefs.displayScript = DisplayScript.HANS; prefs.appTextScale = 1.15f; prefs.helpMode = HelpMode.FULL
             ui = runner.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
             val info = ui.serviceInfo
             info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
@@ -108,16 +109,28 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
             click("打开设置，开始")
             find(if (task == GuideTask.FONT_SIZE) "请点圈住的“Display size and text”。" else "请点圈住的“Brightness level”。", false)
             val session = prefs.guideSessionId
-            checkClearTarget()
-            check(roots().none { it.text?.toString() in setOf("收起提示", "换个位置", "听一次", "更多") }) { "Old utility buttons are still on the card" }
+            val expanded = checkClearTarget()
             capture("sentence")
-            prefs.finish(PracticeOutcome.ENDED)
+            click("更多"); click("收起提示")
+            val compact = checkClearTarget()
+            check(compact.height() < expanded.height()) { "Collapsed card did not shrink" }
+            capture("compact")
+            click("查看本步文字"); click("更多"); click("换个位置")
+            checkClearTarget(); capture("moved")
+            click("先停一下"); find("指引已暂停", false)
+            check(prefs.sessionState.phase == SessionPhase.PAUSED && prefs.guideSessionId == session)
+            click("继续指引"); find("听一次")
+            check(prefs.sessionState.phase == SessionPhase.RUNNING && prefs.guideSessionId == session)
+            click("更多"); click("结束，不确认")
+            find("结束这次引导？", false); click("继续这次任务")
+            check(prefs.active && prefs.guideSessionId == session)
+            click("结束，不确认"); click("结束引导")
             check(!prefs.active && prefs.guideSessionId == session)
-            log += "Short card shows one sentence, stays clear of the target, and has no utility row"
+            log += "Sentence + progressive options; collapse/move/pause preserve attempt; cancel exit preserves task"
             result.putString("stream", "\nPASS\n" + log.joinToString("\n") + "\n"); code = Activity.RESULT_OK
         } catch (e: Throwable) { result.putString("stream", "\nFAIL: ${e.message}\n" + log.joinToString("\n") + "\n") }
         finally {
-            targetContext.getSharedPreferences("guide", 0).edit().putString("text", text.name).putBoolean("muted", mute).commit()
+            snapshot.restore()
         }
         runner.finish(code, result)
     }

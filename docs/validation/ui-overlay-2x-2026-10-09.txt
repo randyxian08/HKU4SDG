@@ -1,0 +1,22 @@
+2026-10-09, Android 15 / API 35, sdk_gphone64_arm64 emulator.
+Native platform actions, not a user study or full TalkBack acceptance.
+
+PASS
+click + role + >=48dp: 调亮屏幕
+click + role + >=48dp: 打开设置，开始
+card clear of Brightness level: Rect(32, 1745 - 1049, 2305)
+click + role + >=48dp: 更多
+click + role + >=48dp: 收起提示
+card clear of Brightness level: Rect(32, 1956 - 1049, 2305)
+click + role + >=48dp: 查看本步文字
+click + role + >=48dp: 更多
+click + role + >=48dp: 换个位置
+card clear of Brightness level: Rect(32, 1225 - 1049, 2305)
+click + role + >=48dp: 先停一下
+click + role + >=48dp: 继续指引
+click + role + >=48dp: 更多
+click + role + >=48dp: 结束，不确认
+click + role + >=48dp: 继续这次任务
+click + role + >=48dp: 结束，不确认
+click + role + >=48dp: 结束引导
+Sentence + progressive options; collapse/move/pause preserve attempt; cancel exit preserves task

@@ -40,8 +40,8 @@ internal class GuideOverlay(private val service: AccessibilityService) {
     private fun gap(parent: LinearLayout, h: Int = 8) { parent.addView(View(service), LinearLayout.LayoutParams(1, dp(h))) }
     private fun label(value: String, size: Float, color: Int = Design.ink, bold: Boolean = false) = service.text(value, size, color, bold)
     private fun tap(value: String, fill: Int = Design.surface, color: Int = Design.ink, click: () -> Unit) =
-        label(value, 18f, if (fill == Design.forest) Design.surface else color, true).apply {
-            gravity = Gravity.CENTER; minHeight = dp(64); minWidth = dp(64)
+        label(value, 16f, if (fill == Design.forest) Design.surface else color, true).apply {
+            gravity = Gravity.CENTER; minHeight = dp(52); minWidth = dp(48)
             setPadding(dp(12), dp(12), dp(12), dp(12)); isFocusable = true
             accessibilityDelegate = object : View.AccessibilityDelegate() {
                 override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
@@ -49,7 +49,7 @@ internal class GuideOverlay(private val service: AccessibilityService) {
                 }
             }
             background = if (fill == Design.forest) Design.ripple(Design.forest, dp(14).toFloat())
-                else Design.ripple(Design.surface, dp(14).toFloat(), Design.forest, dp(3))
+                else Design.ripple(Design.surface, dp(14).toFloat(), Design.line, dp(1))
             setOnClickListener { click() }
         }
     private fun pair(parent: LinearLayout, left: View, right: View) {
@@ -59,8 +59,14 @@ internal class GuideOverlay(private val service: AccessibilityService) {
             addView(right, LinearLayout.LayoutParams(0, -2, 1f))
         })
     }
-    fun showStep(step: GuideStep, bounds: Rect?, message: String, textLanguage: GuideLanguage,
-        showDone: Boolean, doneLabel: String, onDone: () -> Unit, onUnavailable: () -> Unit) {
+    private var picker: String? = null
+    fun showStep(step: GuideStep, bounds: Rect?, message: String,
+        textLanguage: GuideLanguage, voiceLanguage: GuideLanguage,
+        collapsed: Boolean, muted: Boolean, independent: Boolean, adjusting: Boolean,
+        toolsExpanded: Boolean, onTools: () -> Unit, onRefresh: () -> Unit, onMove: () -> Unit, onUnavailable: () -> Unit,
+        onCollapse: () -> Unit, onTextLanguage: (GuideLanguage) -> Unit, onVoiceLanguage: (GuideLanguage) -> Unit,
+        onReplay: () -> Unit, onMute: () -> Unit, onExit: () -> Unit, onPause: () -> Unit,
+        onHint: () -> Unit, onConfirm: () -> Unit, onAdjust: () -> Unit) {
         clear()
         val l = textLanguage
         onNoRoom = onUnavailable
@@ -69,22 +75,73 @@ internal class GuideOverlay(private val service: AccessibilityService) {
         val offBottom = bounds != null && bounds.top >= screenHeight - dp(8)
         val showArrow = step.isScrollHint || offTop || offBottom
         val pointDown = !offTop
-        if (showArrow) {
-            val words = if (pointDown) c(l, "向上划，下面还有", "向上扫，下面仲有", "Swipe up. More is below.")
-                else c(l, "向下划，上面还有", "向下扫，上面仲有", "Swipe down. More is above.")
-            addArrow(pointDown, if (Design.displayScript == DisplayScript.HANT) Han.convert(words) else words)
-            preferred = if (pointDown) OverlaySide.TOP else OverlaySide.BOTTOM
-        } else if (bounds != null) addRing(bounds)
+        if (!independent || adjusting || step.isComplete) {
+            if (showArrow) {
+                val words = if (pointDown) c(l, "向上滑，下面还有", "向上扫，下面仲有", "Swipe up. More is below.")
+                    else c(l, "向下滑，上面还有", "向下扫，上面仲有", "Swipe down. More is above.")
+                addArrow(pointDown, if (Design.displayScript == DisplayScript.HANT) Han.convert(words) else words)
+            } else if (bounds != null) addRing(bounds)
+        }
         val content = column()
         val controls = column()
-        if (showDone) controls.addView(tap(doneLabel, Design.forest, Design.surface, onDone))
-        else content.addView(label(message, 18f, bold = true).apply {
-            setLineSpacing(dp(3).toFloat(), 1f)
-            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        })
+        val mandatory = step.isComplete || step.isScrollHint || adjusting
+        if (step.isComplete) {
+            content.addView(label(ExperienceCopy.question(step.task, l), 20f, bold = true).heading())
+        } else if (independent && !adjusting) {
+            content.addView(label(ExperienceCopy.own(l), 18f))
+        } else if (!collapsed || mandatory) {
+            content.addView(label(message, 18f, bold = true).apply {
+                setLineSpacing(dp(3).toFloat(), 1f)
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            })
+        }
+        val primaryChildCount = content.childCount
+        if (toolsExpanded) {
+            gap(content, 12)
+            if (!mandatory && !independent) {
+                content.addView(tap(if (collapsed) c(l, "查看本步文字", "睇本步文字", "Show step text") else c(l, "收起提示", "收起提示", "Collapse"), click = onCollapse))
+                gap(content)
+            }
+            pair(content, tap(SupportCopy.pause(l), click = onPause), tap(c(l, "换个位置", "换个位", "Move card"), click = onMove))
+            gap(content)
+            content.addView(tap(SupportCopy.sound(l, muted), click = onMute))
+            gap(content)
+            content.addView(tap("${SupportCopy.text(l)} · ${textLanguage.label}") { picker = if (picker == "text") null else "text"; onRefresh() })
+            if (picker == "text") languageChoices(content, textLanguage, onTextLanguage)
+            gap(content)
+            content.addView(tap("${SupportCopy.voice(l)} · ${voiceLanguage.label}") { picker = if (picker == "voice") null else "voice"; onRefresh() })
+            if (picker == "voice") languageChoices(content, voiceLanguage, onVoiceLanguage)
+            if (step.isComplete && step.task in setOf(GuideTask.FONT_SIZE, GuideTask.SCREEN_BRIGHTNESS)) {
+                gap(content); content.addView(tap(ExperienceCopy.adjust(l), click = onAdjust))
+            }
+            gap(content); content.addView(tap(ExperienceCopy.unconfirmed(l), click = onExit))
+        }
+        val options = tap(if (toolsExpanded) c(l, "收起更多", "收起更多", "Close options") else c(l, "更多", "更多", "More")) { picker = null; onTools() }
+        when {
+            step.isComplete || adjusting -> {
+                controls.addView(tap(ExperienceCopy.confirm(l), Design.forest, Design.surface, onConfirm))
+                gap(controls, 6); pair(controls, tap(SupportCopy.replay(l), click = onReplay), options)
+            }
+            independent -> pair(controls, tap(ExperienceCopy.hint(l), Design.forest, Design.surface, onHint), options)
+            collapsed && !mandatory -> pair(controls, tap(c(l, "查看本步文字", "睇本步文字", "Show step text"), click = onCollapse), options)
+            else -> pair(controls, tap(if (muted) c(l, "听一次", "听一次", "Play once") else SupportCopy.replay(l), click = onReplay), options)
+        }
         val avoid = if (!showArrow) bounds else if (pointDown)
             Rect(0, screenHeight - dp(8), 1, screenHeight) else Rect(0, 0, 1, dp(88))
-        showCard(content, controls, avoid, l, if (showDone) 0 else 1)
+        showCard(content, controls, avoid, l, primaryChildCount)
+    }
+    private fun languageChoices(parent: LinearLayout, selected: GuideLanguage, change: (GuideLanguage) -> Unit) {
+        GuideLanguage.entries.forEach { language ->
+            gap(parent, 6)
+            parent.addView(tap(language.label, if (selected == language) Design.forest else Design.surface) { picker = null; change(language) }.apply {
+                accessibilityDelegate = object : View.AccessibilityDelegate() {
+                    override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                        super.onInitializeAccessibilityNodeInfo(host, info)
+                        info.className = android.widget.RadioButton::class.java.name; info.isCheckable = true; info.isChecked = selected == language
+                    }
+                }
+            })
+        }
     }
     fun showStatus(message: String, l: GuideLanguage, onResume: () -> Unit, onExit: () -> Unit, onDiagnostics: (() -> Unit)? = null) {
         clear(); val content = column(); val controls = column()
@@ -152,7 +209,7 @@ internal class GuideOverlay(private val service: AccessibilityService) {
         if (moveRequested) preferred = position.side
         moveRequested = false; lastSide = position.side
         val container = column().apply {
-            background = Design.shape(Design.surface, dp(24).toFloat(), Design.forest, dp(3)); clipToOutline = true; elevation = dp(4).toFloat()
+            background = Design.shape(Design.surface, dp(24).toFloat(), Design.line, dp(1)); clipToOutline = true; elevation = dp(4).toFloat()
             addView(ScrollView(service).apply { addView(content); isFillViewport = false }, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(controls, LinearLayout.LayoutParams(-1, -2))
         }

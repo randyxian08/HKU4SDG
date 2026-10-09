@@ -1,0 +1,9 @@
+2026-10-09, Android 15 / API 35, sdk_gphone64_arm64 emulator.
+Native platform actions, not a user study or full TalkBack acceptance.
+
+Waiting up to 10 seconds for the guide service rebind
+
+PASS
+Chinese Settings font row + actual slider + system value increase + user confirmation
+Chinese Settings brightness row + actual slider + value increase + user confirmation
+Unknown Settings page: no circled target; explicit redacted compatibility export

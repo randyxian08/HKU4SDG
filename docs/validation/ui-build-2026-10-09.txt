@@ -1,0 +1,16 @@
+2026-10-09 local checks; GitHub CI did not start because of account billing/spending limits.
+
+./gradlew :guide:assembleDebug :guide:assembleRelease :guide:assembleDebugAndroidTest :demo-target:assembleDebug :guide:testDebugUnitTest :guide:lintDebug :demo-target:lintDebug --console=plain
+BUILD SUCCESSFUL
+Kotlin: 28 tests, 0 failures, 0 errors.
+Lint: no errors. guide: 6 warnings; demo-target: 3 warnings.
+Release is unsigned; no store publication or APK release.
+
+python3 -m unittest discover -s scripts -p 'test_voice_proxy.py'
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 1.803s
+
+OK
+
+Debug APK SHA-256: ed8220c8c49cc514ba866cf7dc917bcc9f338d06a6f8bee6fc19c2f12691a9b0

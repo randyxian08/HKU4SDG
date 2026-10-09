@@ -16,13 +16,13 @@ internal object Design {
     val background = 0xFFFFFFFF.toInt()
     val surface = 0xFFFFFFFF.toInt()
     val ink = 0xFF173B35.toInt()
-    val secondary = 0xFF173B35.toInt()
+    val secondary = 0xFF52665F.toInt()
     val forest = 0xFF17483E.toInt()
-    val paleGreen = 0xFFFFFFFF.toInt()
+    val paleGreen = 0xFFF0F5F2.toInt()
     val orange = 0xFF173B35.toInt()
     val paleOrange = 0xFFFFFFFF.toInt()
-    val line = 0xFF173B35.toInt()
-    var appScale = 1.35f
+    val line = 0xFFDCE7E0.toInt()
+    var appScale = 1.15f
     var displayScript = DisplayScript.HANS
 
     fun shape(fill: Int, radius: Float, stroke: Int? = null, strokeWidth: Int = 1): GradientDrawable =

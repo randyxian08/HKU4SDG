@@ -171,7 +171,7 @@ class MainActivity : Activity() {
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(14), dp(22), 0)
+            setPadding(0, dp(14), 0, 0)
         }
         val brand = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         brand.addView(HandrailMark(this).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO },
@@ -179,9 +179,9 @@ class MainActivity : Activity() {
         brand.addView(text(c("数字扶手", "数字扶手", "Digital Handrail"), 17f, Design.ink, true).apply { setPadding(dp(10), 0, 0, 0) },
             LinearLayout.LayoutParams(0, -2, 1f))
         val navigation = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        navigation.addView(action(c("记录", "记录", "History"), Design.surface, Design.ink, 64) { showPractice() })
-        navigation.addView(action(c("字和声音", "字和声音", "Text and voice"), Design.surface, Design.ink, 64) { showAdjust() })
-        if (resources.configuration.fontScale > 1.4f) {
+        navigation.addView(action(c("记录", "记录", "History"), Design.surface, Design.ink, 56) { showPractice() })
+        navigation.addView(action(c("设置", "设置", "Settings"), Design.surface, Design.ink, 64) { showAdjust() })
+        if (resources.configuration.fontScale * Design.appScale > 1.5f || l == GuideLanguage.ENGLISH) {
             header.addView(brand)
             space(header, 12)
             header.addView(navigation)
@@ -189,31 +189,37 @@ class MainActivity : Activity() {
             brand.addView(navigation)
             header.addView(brand)
         }
-        root.addView(header)
+        body.addView(header)
+        space(body, 8)
         if (preferences.active) {
             space(body, 18)
             body.addView(action(SupportCopy.recoveryTitle(l), Design.paleGreen, Design.forest, 52) { showRecovery() })
         }
         space(body, 28)
-        body.addView(text(c("有什么软件上的操作，你不知道该点哪里？", "有什么软件上的操作，你不知道该点哪里？", "Which button should you tap?"), 28f, Design.ink, true).heading())
+        body.addView(text(c("你想在手机上做什么？", "你想喺手机做啲乜？", "What would you like to do?"), 28f, Design.ink, true).heading())
         space(body, 18)
+        body.addView(text(c("说出来，或打字告诉我。", "讲出来，或者打字话我知。", "Tell us by voice or text."), 16f, Design.secondary))
+        space(body, 14)
+        val composerIndex = body.childCount
         val profile = TaskAvailability.profile(this)
+        body.addView(text(c("也可以从这里开始", "亦可以喺呢度开始", "Or start with a task"), 18f, Design.ink, true).heading())
+        space(body, 12)
         GuideTask.entries.forEach { task ->
             val block = TaskCatalog.block(task, profile)
             val title = taskTitle(task)
             val subtitle = if (block == null) taskDetail(task) else c("现在还带不了", "现在还带不了", "Not available yet")
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                minimumHeight = dp(96)
+                minimumHeight = dp(80)
                 setPadding(dp(18), dp(18), dp(18), dp(18))
-                background = Design.ripple(Design.surface, dp(16).toFloat(), Design.forest, dp(3))
+                background = Design.ripple(Design.surface, dp(16).toFloat(), Design.line, dp(1))
                 markAsButton()
                 contentDescription = "$title. $subtitle"
-                setOnClickListener { selectedTask = task; taskSuggestedByAi = false; showConfirm() }
+                setOnClickListener { selectedTask = task; taskSuggestedByAi = false; showTask() }
             }
-            card.addView(text(title, 24f, Design.ink, true))
+            card.addView(text(title, 20f, Design.ink, true).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
             space(card, 8)
-            card.addView(text(subtitle, 18f, Design.ink))
+            card.addView(text(subtitle, 15f, Design.ink).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
             body.addView(card)
             space(body, 12)
         }
@@ -231,18 +237,17 @@ class MainActivity : Activity() {
         serviceRowView.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
         serviceRowView.addView(icon(R.drawable.ic_chevron_right))
         body.addView(serviceRowView)
-        root.addView(ScrollView(this).apply { isFillViewport = true; addView(body) }, LinearLayout.LayoutParams(-1, 0, 1f))
         val composer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(12), dp(22), dp(12))
+            setPadding(0, 0, 0, dp(24))
             setBackgroundColor(Design.background)
         }
         input = EditText(this).apply {
             hint = c("例如：把字调大", "例如：把字调大", "e.g. Make the text larger")
-            textSize = (22f * Design.appScale).coerceAtLeast(18f)
+            textSize = (19f * Design.appScale).coerceAtLeast(18f)
             setTextColor(Design.ink)
             setHintTextColor(Design.ink)
-            background = Design.shape(Design.surface, dp(18).toFloat(), Design.forest, dp(3))
+            background = Design.shape(Design.surface, dp(18).toFloat(), Design.line, dp(1))
             setPadding(dp(16), dp(14), dp(16), dp(14))
             minHeight = dp(56)
             maxLines = 2
@@ -254,19 +259,10 @@ class MainActivity : Activity() {
         composer.addView(input, LinearLayout.LayoutParams(-1, -2))
         space(composer, 8)
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        speechButton = action(c("按住说话", "按住说话", "Hold to talk"), Design.surface, Design.ink, 64) { beginListening() }
-        speechButton.setOnTouchListener { _, event ->
-            when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> { if (!speechBusy && !cloudAsr.isRecording()) beginListening(); true }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (speechBusy || cloudAsr.isRecording()) beginListening(); true
-                }
-                else -> false
-            }
-        }
+        speechButton = action(c("说话", "讲嘢", "Speak"), Design.forest, Design.surface, 64) { beginListening() }
         actions.addView(speechButton, LinearLayout.LayoutParams(0, -2, 1f))
         actions.addView(View(this), LinearLayout.LayoutParams(dp(8), 1))
-        actions.addView(action(c("开始找", "开始找", "Find it"), Design.forest, Design.surface, 64) { submitGoal() },
+        actions.addView(action(c("查找引导", "搵指引", "Find a guide"), Design.surface, Design.ink, 64) { submitGoal() },
             LinearLayout.LayoutParams(0, -2, 1f))
         composer.addView(actions)
         space(composer, 8)
@@ -278,7 +274,8 @@ class MainActivity : Activity() {
             background = Design.shape(Design.paleGreen, dp(14).toFloat())
         }
         composer.addView(speechStatus)
-        root.addView(composer)
+        body.addView(composer, composerIndex)
+        root.addView(ScrollView(this).apply { isFillViewport = true; addView(body) }, LinearLayout.LayoutParams(-1, -1))
         applyInsets(root, includeKeyboard = true)
         setContentView(root)
         updateServiceStatus()
@@ -328,7 +325,7 @@ class MainActivity : Activity() {
         speechButton.text = c("说话", "讲嘢", "Speak")
         val goal = input.text.toString().trim()
         if (goal.isEmpty()) {
-            setInputStatus(c("先输入想完成的事，或选择上方任务。", "先输入想做嘅事，或者拣上面嘅任务。", "Enter a goal, or choose a task above."))
+            setInputStatus(c("先输入想完成的事，或选择下方任务。", "先输入想做嘅事，或者拣下面嘅任务。", "Enter a goal, or choose a task below."))
             return
         }
         if (goal.length > 160) {
@@ -336,7 +333,7 @@ class MainActivity : Activity() {
             return
         }
         if (SensitiveGoalGuard.shouldKeepLocal(goal)) {
-            setInputStatus(c("这段文字可能涉及私人内容，已停止发送。请使用上方任务卡。", "呢段文字可能有私人内容，已经停止发送。请用上面嘅任务卡。", "This may contain private information and was not sent. Please use a task card above."))
+            setInputStatus(c("这段文字可能涉及私人内容，已停止发送。请使用下方任务卡。", "呢段文字可能有私人内容，已经停止发送。请用下面嘅任务卡。", "This may contain private information and was not sent. Please use a task card below."))
             return
         }
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
@@ -351,14 +348,15 @@ class MainActivity : Activity() {
                     taskSuggestedByAi = true
                     showConfirm()
                 }
-                IntentClient.Decision.CLARIFY, IntentClient.Decision.UNSUPPORTED -> setInputStatus(c("请说哪个软件、想做哪件事。", "请说哪个软件、想做哪件事。", "Please say which app, and what you want to do."))
+                IntentClient.Decision.CLARIFY -> setInputStatus(GuideContent.intentClarify(preferences.textLanguage))
+                IntentClient.Decision.UNSUPPORTED -> setInputStatus(GuideContent.intentUnsupported(preferences.textLanguage))
                 null -> {
                     val fallback = TaskMatcher.match(goal)
                     if (fallback != null) {
                         selectedTask = fallback
                         taskSuggestedByAi = false
                         showConfirm()
-                    } else setInputStatus(c("请说哪个软件、想做哪件事。", "请说哪个软件、想做哪件事。", "Please say which app, and what you want to do."))
+                    } else setInputStatus(GuideContent.intentUnavailable(preferences.textLanguage))
                 }
             }
         }
@@ -371,11 +369,11 @@ class MainActivity : Activity() {
     }
 
     private fun action(label: String, fill: Int, color: Int, height: Int = 64, click: () -> Unit) =
-        text(label, 20f, if (fill == Design.forest) Design.surface else Design.ink, true, Gravity.CENTER).apply {
-            minHeight = dp(height.coerceAtLeast(64))
+        text(label, 18f, if (fill == Design.forest) Design.surface else Design.ink, true, Gravity.CENTER).apply {
+            minHeight = dp(height.coerceAtLeast(48))
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = if (fill == Design.forest) Design.ripple(Design.forest, dp(16).toFloat())
-                else Design.ripple(Design.surface, dp(16).toFloat(), Design.forest, dp(3))
+                else Design.ripple(Design.surface, dp(16).toFloat(), Design.line, dp(1))
             markAsButton()
             setOnClickListener { click() }
         }
@@ -842,6 +840,7 @@ class MainActivity : Activity() {
     }
 
     private fun showAdjust() {
+        stopInput()
         screen = Screen.ADJUST
         runner().showSettings()
     }

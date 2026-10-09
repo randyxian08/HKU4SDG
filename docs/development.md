@@ -1,6 +1,6 @@
 # 数字扶手｜开发接手指南
 
-更新于 2026-10-03。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。0.1.1 手机实验路径见[手机测试指南](phone-testing.md)。
+更新于 2026-10-09。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。0.1.1 手机实验路径见[手机测试指南](phone-testing.md)。
 
 ## 1. 获取当前实现
 
@@ -10,7 +10,7 @@ cd HKU4SDG
 git switch main
 ```
 
-已有 checkout 时先检查 `git status`，保留自己的未提交工作，再切换到 `main` 并执行 `git pull --ff-only origin main`。本轮功能和验证说明见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。认领和审阅约定见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
+已有 checkout 时先检查 `git status`，保留自己的未提交工作，再切换到 `main` 并执行 `git pull --ff-only origin main`。当前首页、首次设置与浮窗整合说明见 [PR #11](https://github.com/randyxian08/HKU4SDG/pull/11)；四项任务基线见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。认领和审阅约定见 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 
 ## 2. 环境与演示条件
 
@@ -51,7 +51,7 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 
 首次使用按以下顺序操作：
 
-1. 在首页选择任务和帮助方式。
+1. 完成首次语言与字号选择。首页输入／说出需求，再确认目标；也可以直接选择下方任务快捷入口和帮助方式。
 2. 阅读权限用途，进入系统无障碍设置，亲手开启“数字扶手 · 手机引导”。
 3. 返回原任务，确认开始；权限开启不会替用户自动操作。
 4. 在目标应用中点击／拖动圈出的控件。暂停、未知页或离开任务后，恢复时重新核对页面。
@@ -65,6 +65,7 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 
 | 位置 | 负责什么 |
 |---|---|
+| [FirstRun.kt](../guide/src/main/java/org/hku4sdg/handrail/FirstRun.kt) | 首次语言、应用内字号、权限说明与圈画练习；三项独立语言设置 |
 | [MainActivity.kt](../guide/src/main/java/org/hku4sdg/handrail/MainActivity.kt) | 首页、任务确认、权限引导、语言设置、语音输入与练习记录 |
 | [TaskCatalog.kt](../guide/src/main/java/org/hku4sdg/handrail/TaskCatalog.kt)、[TaskAvailability.kt](../guide/src/main/java/org/hku4sdg/handrail/TaskAvailability.kt) | 已审核任务及设备、语言、安装状态、完整版本准入 |
 | [GuideAccessibilityService.kt](../guide/src/main/java/org/hku4sdg/handrail/GuideAccessibilityService.kt) | 实时页面／控件核对、结果检测、中断处理与播报触发 |
@@ -148,12 +149,14 @@ CI 配置见 [android.yml](../.github/workflows/android.yml)。代理单元测�
 
 ### 模拟器界面与浮窗
 
-平台操作检查与 CI 构建分开运行。先结束活动引导，安装 Debug 与开发检查 APK；保持数字扶手服务启用。完整页面的焦点／角色检查复现方式见[界面验收](uiux-validation.md)。浮窗检查使用同一 runner：
+平台操作检查与 CI 构建分开运行。先结束活动引导，安装 Debug 与开发检查 APK；保持数字扶手服务启用。当前证据与条件见[整合记录](ui-integration-2026-10-09.md)。完整页面的焦点／角色检查需要先启用 TalkBack。浮窗检查使用同一 runner：
 
 ```bash
 adb install -r guide/build/outputs/apk/androidTest/debug/guide-debug-androidTest.apk
 adb shell am instrument -w -e check overlay org.hku4sdg.handrail.test/org.hku4sdg.handrail.AccessibilityCheck
 # 亮度任务使用 -e check overlay -e task brightness
+# 英文系统、起始字号 1.0 下的首页／首次设置／完成条件检查：
+adb shell am instrument -w -e check integration org.hku4sdg.handrail.test/org.hku4sdg.handrail.AccessibilityCheck
 ```
 
 启动 Instrumentation 会结束先前目标进程；浮窗检查最多等待 10 秒重新绑定服务。预先准备另一终端；启动检查后，只重新绑定数字扶手，保留其他已启用服务。以下示例在数字扶手原本已启用时使用：
@@ -180,7 +183,7 @@ adb('settings', 'put', 'secure', 'accessibility_enabled', '1')
 PY_REBIND
 ```
 
-1.0 字号运行字体任务；2.0 字号须使用亮度任务，字体任务在该比例已达准入上限。用 `adb shell settings put system font_scale 1.0` 或 `2.0` 设置，结束后恢复演示字号。检查会产生测试练习记录并结束测试进程，服务可能需要再次绑定；这不是正常使用中的应用崩溃。原生接口检查不等于完整 TalkBack 手势／朗读顺序或目标用户试用。
+1.0 字号运行字体任务；2.0 字号须使用亮度任务，字体任务在该比例已达准入上限。用 `adb shell settings put system font_scale 1.0` 或 `2.0` 设置，结束后恢复演示字号。检查会恢复原偏好与练习记录；改变系统值的检查恢复起始数值。结束测试进程后，服务可能需要再次绑定；这不是正常使用中的应用崩溃。原生接口检查不等于完整 TalkBack 手势／朗读顺序或目标用户试用。
 
 ### 意图对照
 

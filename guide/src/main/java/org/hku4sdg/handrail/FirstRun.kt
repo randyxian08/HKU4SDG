@@ -1,20 +1,20 @@
 package org.hku4sdg.handrail
 
-import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import android.os.Build
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
 
-/** First-open path, and the later “字和声音” page. White page, dark green type, one filled button. */
+/** Remembered, optional setup. Input, written replies and spoken replies stay independent. */
 internal class FirstRun(
     private val activity: Activity,
     private val preferences: GuidePreferences,
@@ -23,331 +23,197 @@ internal class FirstRun(
     private val onDone: () -> Unit,
     private val onHome: () -> Unit
 ) {
-    private var settings = false
-
-    fun showWizard() {
-        settings = false
-        sync()
-        when (preferences.initStep) {
-            0 -> script()
-            1 -> size()
-            2 -> speak()
-            3 -> hear()
-            4 -> permission()
-            else -> practice()
-        }
-    }
-
-    fun showSettings() {
-        settings = true
-        sync()
-        page(bodyOf = {
-            val page = it
-            page.addView(activity.text("字和声音", 28f, Design.ink, true))
-            gap(page, 18)
-            page.addView(activity.text("看的字", 22f, Design.ink, true))
-            gap(page, 10)
-            scriptChoices(page) { showSettings() }
-            gap(page, 22)
-            page.addView(activity.text("这个应用里的字号", 22f, Design.ink, true))
-            gap(page, 10)
-            sizeControl(page)
-            gap(page, 22)
-            page.addView(activity.text("你跟应用说话时，会用什么语言？", 22f, Design.ink, true))
-            gap(page, 10)
-            speakChoices(page) { showSettings() }
-            gap(page, 22)
-            page.addView(activity.text("你希望应用用什么语言回你？", 22f, Design.ink, true))
-            gap(page, 10)
-            hearChoices(page) { showSettings() }
-            gap(page, 28)
-            page.addView(filled("完成") { onHome() })
-        })
-    }
-
+    private fun c(zh: String, yue: String, en: String) = ExperienceCopy.choose(preferences.textLanguage, zh, yue, en)
     private fun sync() {
         Design.appScale = preferences.appTextScale
         Design.displayScript = preferences.displayScript ?: DisplayScript.HANS
     }
-
-    private fun script() {
-        val root = white()
-        val body = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(activity.dp(22), activity.dp(28), activity.dp(22), activity.dp(24))
+    fun showWizard() {
+        sync()
+        when (preferences.initStep) {
+            0 -> script()
+            1 -> size()
+            2 -> languagePage(input = true)
+            3 -> languagePage(input = false)
+            4 -> permission()
+            else -> practice()
         }
-        listOf(
-            Triple("请选择你的语言", "简体中文", DisplayScript.HANS),
-            Triple("請選擇你的語言", "繁體中文", DisplayScript.HANT),
-            Triple("Please choose your language", "English", DisplayScript.EN)
-        ).forEach { (question, label, script) ->
-            body.addView(activity.text(question, 26f, Design.ink, true, convert = false))
-            gap(body, 10)
-            val chosen = preferences.displayScript == script
-            body.addView(choice(label, chosen, convert = false) {
-                preferences.applyLook(script)
-                preferences.appTextScale = 1.35f
+    }
+    fun showSettings() {
+        sync()
+        page { body ->
+            heading(body, c("字和声音", "文字同声音", "Text and voice"))
+            section(body, c("界面文字与 AI 回复", "界面文字同 AI 提示", "App text and AI replies"))
+            languageChoices(body, preferences.textLanguage) { preferences.textLanguage = it; showSettings() }
+            section(body, c("中文显示方式", "中文显示方式", "Chinese writing style"))
+            scriptChoices(body) { showSettings() }
+            section(body, c("这个应用里的字号", "呢个应用嘅字大细", "Text size in this app"))
+            sizeControl(body)
+            section(body, c("你说话或输入的语言", "你讲嘢或者输入嘅语言", "Your input language"))
+            languageChoices(body, preferences.inputLanguage) { preferences.inputLanguage = it; showSettings() }
+            section(body, c("语音播报语言", "语音播报语言", "Spoken guidance language"))
+            languageChoices(body, preferences.voiceLanguage) { preferences.voiceLanguage = it; showSettings() }
+            gap(body, 20)
+            body.addView(button(c("完成", "完成", "Done"), true, click = onHome))
+        }
+    }
+    private fun script() {
+        page { body ->
+            body.addView(activity.text("请选择语言 / 請選擇語言\nChoose your language", 26f, bold = true, convert = false).heading())
+            gap(body, 24)
+            scriptChoices(body, initialLanguage = true) {
                 preferences.initStep = 1
                 showWizard()
-            })
-            gap(body, 28)
+            }
         }
-        root.addView(scroll(body))
-        activity.setContentView(root)
     }
-
-    private fun scriptChoices(parent: LinearLayout, refresh: () -> Unit) {
-        listOf(
-            "简体中文" to DisplayScript.HANS,
-            "繁體中文" to DisplayScript.HANT,
-            "English" to DisplayScript.EN
-        ).forEach { (label, script) ->
-            parent.addView(choice(label, preferences.displayScript == script, convert = false) {
-                preferences.applyLook(script)
+    private fun scriptChoices(body: LinearLayout, initialLanguage: Boolean = false, refresh: () -> Unit) {
+        val choices = mutableListOf("简体中文" to DisplayScript.HANS, "繁體中文" to DisplayScript.HANT)
+        if (initialLanguage) choices += "English" to DisplayScript.EN
+        choices.forEach { (label, script) ->
+            body.addView(button(label, preferences.displayScript == script, convert = false) {
+                if (initialLanguage) preferences.applyLook(script) else preferences.displayScript = script
                 refresh()
-            })
-            gap(parent, 12)
+            }.radio(preferences.displayScript == script))
+            gap(body, 10)
         }
     }
-
     private fun size() {
-        page {
-            it.addView(activity.text("拖一拖，字会马上变大变小。", 26f, Design.ink, true))
-            gap(it, 8)
-            it.addView(activity.text("这里只调这个应用里的字。", 18f, Design.ink))
-            gap(it, 18)
-            sizeControl(it)
-            gap(it, 28)
-            it.addView(filled("继续") {
-                preferences.initStep = 2
-                showWizard()
-            })
+        page { body ->
+            heading(body, c("先选一个舒服的字号", "先拣个舒服嘅字大细", "Choose a comfortable text size"))
+            body.addView(activity.text(c("只改变数字扶手里的文字。以后随时可以调整。", "只改数字扶手嘅文字，之后随时可以再调。", "This changes only Digital Handrail. You can adjust it anytime."), 16f, Design.secondary))
+            gap(body, 24)
+            sizeControl(body)
+            next(body, 2)
         }
     }
-
-    private fun sizeControl(parent: LinearLayout) {
-        val preview = activity.text("这句话用来看字大不大。", 28f, Design.ink, true)
-        parent.addView(preview)
-        gap(parent, 16)
-        val seek = SeekBar(activity).apply {
+    private fun sizeControl(body: LinearLayout) {
+        val preview = activity.text(c("这句话用来看看字是否合适。", "睇下呢句话嘅字大细系咪舒服。", "Check whether this text feels comfortable."), 24f, bold = true)
+        body.addView(preview)
+        gap(body, 14)
+        body.addView(SeekBar(activity).apply {
             max = 60
-            val scale = preferences.appTextScale.coerceIn(0.9f, 1.5f)
-            progress = (((scale - 0.9f) / 0.6f) * 60).toInt()
+            progress = ((preferences.appTextScale.coerceIn(.9f, 1.5f) - .9f) * 100).toInt()
             minimumHeight = activity.dp(48)
+            contentDescription = c("数字扶手文字大小", "数字扶手字大细", "Digital Handrail text size")
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                    val next = 0.9f + value / 60f * 0.6f
-                    preferences.appTextScale = next
-                    preview.textSize = (28f * next).coerceAtLeast(22f)
+                    if (!fromUser) return
+                    val scale = .9f + value / 100f
+                    preferences.appTextScale = scale
+                    preview.textSize = (24f * scale).coerceAtLeast(18f)
                 }
-                override fun onStartTrackingTouch(bar: SeekBar?) {}
-                override fun onStopTrackingTouch(bar: SeekBar?) {}
+                override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar?) = Unit
             })
-        }
-        parent.addView(seek)
-    }
-
-    private fun speak() {
-        if (activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
-            activity.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 21)
-        page {
-            it.addView(activity.text("你跟应用说话时，会用什么语言？", 26f, Design.ink, true))
-            gap(it, 8)
-            it.addView(activity.text("可以多选。不允许麦克风，也可以继续，以后用打字。", 18f, Design.ink))
-            gap(it, 16)
-            speakChoices(it) { showWizard() }
-            gap(it, 28)
-            it.addView(filled("继续") {
-                val chosen = preferences.speakLanguages
-                preferences.inputLanguage = when {
-                    GuideLanguage.CANTONESE in chosen -> GuideLanguage.CANTONESE
-                    GuideLanguage.MANDARIN in chosen -> GuideLanguage.MANDARIN
-                    GuideLanguage.ENGLISH in chosen -> GuideLanguage.ENGLISH
-                    else -> preferences.inputLanguage
-                }
-                preferences.initStep = 3
-                showWizard()
-            })
-        }
-    }
-
-    private fun speakChoices(parent: LinearLayout, refresh: () -> Unit) {
-        listOf(
-            GuideLanguage.CANTONESE to "粤语",
-            GuideLanguage.MANDARIN to "普通话",
-            GuideLanguage.ENGLISH to "英语"
-        ).forEach { (language, label) ->
-            val on = language in preferences.speakLanguages
-            parent.addView(choice(if (on) "$label  ✓" else label, on) {
-                val next = preferences.speakLanguages.toMutableSet()
-                if (on) next.remove(language) else next.add(language)
-                preferences.speakLanguages = next
-                refresh()
-            })
-            gap(parent, 12)
-        }
-    }
-
-    private fun hear() {
-        page {
-            it.addView(activity.text("你希望应用用什么语言回你？", 26f, Design.ink, true))
-            gap(it, 16)
-            hearChoices(it) { showWizard() }
-            gap(it, 28)
-            it.addView(filled("继续") {
-                preferences.initStep = 4
-                showWizard()
-            })
-        }
-    }
-
-    private fun hearChoices(parent: LinearLayout, refresh: () -> Unit) {
-        listOf(
-            GuideLanguage.CANTONESE to "粤语",
-            GuideLanguage.MANDARIN to "普通话",
-            GuideLanguage.ENGLISH to "英语"
-        ).forEach { (language, label) ->
-            parent.addView(choice(if (preferences.voiceLanguage == language) "$label  ✓" else label, preferences.voiceLanguage == language) {
-                preferences.voiceLanguage = language
-                refresh()
-            })
-            gap(parent, 12)
-        }
-    }
-
-    private fun permission() {
-        val on = serviceOn()
-        page {
-            if (!preferences.accessAgreed) {
-                it.addView(activity.text("圆圈要浮在别的应用上面。", 26f, Design.ink, true))
-                gap(it, 12)
-                it.addView(activity.text("只提示，不替你点，不替你输入。", 22f, Design.ink))
-                gap(it, 28)
-                it.addView(filled("同意") {
-                    preferences.accessAgreed = true
-                    showWizard()
-                })
-                return@page
-            }
-            if (on) {
-                it.addView(activity.text("开好了", 32f, Design.ink, true))
-                gap(it, 12)
-                it.addView(activity.text("来完成你的第一次引导吧。", 22f, Design.ink))
-                gap(it, 28)
-                it.addView(filled("来完成你的第一次引导吧") {
-                    preferences.initStep = 5
-                    showWizard()
-                })
-                return@page
-            }
-            if (preferences.accessLeft)
-                it.addView(activity.text("还没打开，圆圈出不来。", 28f, Design.ink, true))
-            else {
-                it.addView(activity.text("接下来是手机系统的页面，不是我们的页面。", 24f, Design.ink, true))
-                gap(it, 12)
-                it.addView(activity.text("找到「数字扶手 · 手机引导」，把开关打开，再回到这里。", 20f, Design.ink))
-                gap(it, 12)
-                it.addView(activity.text("如果开关是灰的：先打开这个应用的「应用信息」，点右上角三个点，点「允许受限制的设置」，再回来把开关打开。", 18f, Design.ink))
-            }
-            gap(it, 28)
-            it.addView(filled(if (preferences.accessLeft) "再去打开" else "去打开") {
-                preferences.accessLeft = true
-                openAccess()
-            })
-        }
-    }
-
-    private fun practice() {
-        val root = white()
-        val body = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(activity.dp(22), activity.dp(48), activity.dp(22), activity.dp(24))
-        }
-        body.addView(activity.text("请点这里", 34f, Design.ink, true, Gravity.CENTER))
-        gap(body, 28)
-        val button = filled("点这里") {
-            preferences.initDone = true
-            preferences.initStep = 6
-            done()
-        }
-        val ring = object : View(activity) {
-            val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Design.forest
-                style = Paint.Style.STROKE
-                strokeWidth = activity.dp(8).toFloat()
-            }
-            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.forest }
-            val number = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.WHITE
-                textAlign = Paint.Align.CENTER
-                textSize = activity.dp(22).toFloat()
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-            }
-            override fun onDraw(canvas: Canvas) {
-                val pad = activity.dp(20).toFloat()
-                canvas.drawRoundRect(pad, pad, width - pad, height - pad, activity.dp(18).toFloat(), activity.dp(18).toFloat(), stroke)
-                canvas.drawCircle(pad, pad, activity.dp(18).toFloat(), badge)
-                canvas.drawText("1", pad, pad - (number.ascent() + number.descent()) / 2f, number)
-            }
-        }
-        val wrap = FrameLayout(activity)
-        wrap.addView(ring, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, activity.dp(120)))
-        wrap.addView(button, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, activity.dp(72)).apply {
-            leftMargin = activity.dp(28)
-            rightMargin = activity.dp(28)
-            topMargin = activity.dp(24)
         })
-        body.addView(wrap, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, activity.dp(120)))
-        root.addView(body)
-        activity.setContentView(root)
     }
-
-    private fun done() {
-        page {
-            it.addView(activity.text("完成了", 36f, Design.ink, true, Gravity.CENTER))
-            gap(it, 28)
-            it.addView(filled("进入首页") { onDone() })
+    private fun languagePage(input: Boolean) {
+        page { body ->
+            heading(body, if (input) c("你会用什么语言说话？", "你会用咩语言讲嘢？", "What language will you use?")
+                else c("希望用什么语言听提示？", "想用咩语言听提示？", "Which language should we speak?"))
+            body.addView(activity.text(c("输入、文字和播报可以用不同语言。", "输入、文字同播报可以用唔同语言。", "Input, text and voice can use different languages."), 16f, Design.secondary))
+            gap(body, 20)
+            languageChoices(body, if (input) preferences.inputLanguage else preferences.voiceLanguage) {
+                if (input) preferences.inputLanguage = it else preferences.voiceLanguage = it
+                showWizard()
+            }
+            next(body, if (input) 3 else 4)
         }
     }
-
-    private fun choice(label: String, chosen: Boolean, convert: Boolean = true, click: () -> Unit): TextView =
-        activity.text(label, 22f, if (chosen) Design.surface else Design.ink, true, Gravity.CENTER, convert).apply {
-            minHeight = activity.dp(72)
-            background = if (chosen) Design.ripple(Design.forest, activity.dp(16).toFloat())
-                else Design.ripple(Design.surface, activity.dp(16).toFloat(), Design.forest, activity.dp(3))
+    private fun languageChoices(body: LinearLayout, selected: GuideLanguage, change: (GuideLanguage) -> Unit) {
+        GuideLanguage.entries.forEach { language ->
+            val label = when (language) {
+                GuideLanguage.MANDARIN -> "普通话 · Mandarin"
+                GuideLanguage.CANTONESE -> "粤语 · Cantonese"
+                GuideLanguage.ENGLISH -> "English"
+            }
+            body.addView(button(label, selected == language) { change(language) }.radio(selected == language))
+            gap(body, 10)
+        }
+    }
+    private fun permission() {
+        page { body ->
+            val l = preferences.textLanguage
+            heading(body, SupportCopy.setupHeading(l, serviceOn()))
+            body.addView(activity.text(SupportCopy.setupWhy(l), 18f))
+            gap(body, 14)
+            body.addView(activity.text(SupportCopy.setupPrivacy(l), 16f, Design.secondary))
+            gap(body, 20)
+            if (serviceOn()) {
+                body.addView(button(c("试一次引导", "试一次指引", "Try a guide"), true) {
+                    preferences.initStep = 5; showWizard()
+                })
+            } else {
+                body.addView(activity.text(c("找到“数字扶手 · 手机引导”，开启后回到这里。", "搵「数字扶手 · 手机引导」，开启之后返嚟。", "Choose “数字扶手 · 手机引导” in Settings, enable it, then return here."), 18f))
+                gap(body, 18)
+                body.addView(button(SupportCopy.openSettings(l), true) {
+                    preferences.accessAgreed = true
+                    preferences.accessLeft = true
+                    openAccess()
+                })
+            }
+            gap(body, 12)
+            body.addView(button(c("稍后设置，先看看", "迟啲设置，先睇下", "Set up later, explore first"), false) { finishSetup() })
+        }
+    }
+    private fun practice() {
+        page { body ->
+            heading(body, c("圈出的地方，就是下一步", "圈住嘅地方，就系下一步", "The highlight shows your next step"))
+            body.addView(activity.text(c("试着点一下圈里的按钮。", "试下㩒圈入面嘅掣。", "Try tapping the highlighted button."), 18f))
+            gap(body, 28)
+            val ring = object : View(activity) {
+                val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.forest; style = Paint.Style.STROKE; strokeWidth = activity.dp(5).toFloat() }
+                override fun onDraw(canvas: Canvas) {
+                    val pad = activity.dp(12).toFloat()
+                    canvas.drawRoundRect(pad, pad, width - pad, height - pad, activity.dp(22).toFloat(), activity.dp(22).toFloat(), stroke)
+                }
+            }.apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+            body.addView(FrameLayout(activity).apply {
+                addView(ring, FrameLayout.LayoutParams(-1, activity.dp(104)))
+                addView(button(c("点这里", "㩒呢度", "Tap here"), true) { finishSetup() }, FrameLayout.LayoutParams(-1, activity.dp(64)).apply {
+                    leftMargin = activity.dp(24); rightMargin = activity.dp(24); topMargin = activity.dp(20)
+                })
+            }, LinearLayout.LayoutParams(-1, activity.dp(104)))
+        }
+    }
+    private fun finishSetup() { preferences.initDone = true; preferences.initStep = 6; onDone() }
+    private fun next(body: LinearLayout, step: Int) {
+        gap(body, 20)
+        body.addView(button(c("继续", "继续", "Continue"), true) { preferences.initStep = step; showWizard() })
+    }
+    private fun heading(body: LinearLayout, label: String) { body.addView(activity.text(label, 26f, bold = true).heading()); gap(body, 14) }
+    private fun section(body: LinearLayout, label: String) { gap(body, 22); body.addView(activity.text(label, 19f, bold = true).heading()); gap(body, 12) }
+    private fun button(label: String, filled: Boolean, convert: Boolean = true, click: () -> Unit) =
+        activity.text(label, 18f, if (filled) Design.surface else Design.ink, true, Gravity.CENTER, convert).apply {
+            minHeight = activity.dp(64); setPadding(activity.dp(14), activity.dp(12), activity.dp(14), activity.dp(12))
+            background = Design.ripple(if (filled) Design.forest else Design.surface, activity.dp(16).toFloat(), if (filled) null else Design.line)
+            isFocusable = true
+            accessibilityDelegate = object : View.AccessibilityDelegate() {
+                override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                    super.onInitializeAccessibilityNodeInfo(host, info); info.className = android.widget.Button::class.java.name
+                }
+            }
             setOnClickListener { click() }
         }
-
-    private fun filled(label: String, click: () -> Unit): TextView =
-        activity.text(label, 22f, Design.surface, true, Gravity.CENTER).apply {
-            minHeight = activity.dp(72)
-            background = Design.ripple(Design.forest, activity.dp(16).toFloat())
-            setOnClickListener { click() }
+    private fun TextView.radio(selected: Boolean) = apply {
+        accessibilityDelegate = object : View.AccessibilityDelegate() {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                info.className = android.widget.RadioButton::class.java.name; info.isCheckable = true; info.isChecked = selected
+            }
         }
-
-    private fun page(bodyOf: (LinearLayout) -> Unit) {
-        val root = white()
-        val body = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(activity.dp(22), activity.dp(28), activity.dp(22), activity.dp(28))
+    }
+    private fun page(content: (LinearLayout) -> Unit) {
+        val body = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; setPadding(activity.dp(22), activity.dp(28), activity.dp(22), activity.dp(28)) }
+        content(body)
+        val root = ScrollView(activity).apply { setBackgroundColor(Design.background); addView(body) }
+        root.setOnApplyWindowInsetsListener { _, insets ->
+            val top = if (Build.VERSION.SDK_INT >= 30) insets.getInsets(WindowInsets.Type.statusBars()).top else insets.systemWindowInsetTop
+            val bottom = if (Build.VERSION.SDK_INT >= 30) insets.getInsets(WindowInsets.Type.navigationBars()).bottom else insets.systemWindowInsetBottom
+            root.setPadding(0, top, 0, bottom); insets
         }
-        bodyOf(body)
-        root.addView(scroll(body))
         activity.setContentView(root)
     }
-
-    private fun white() = LinearLayout(activity).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(Design.background)
-        setPadding(0, activity.dp(36), 0, activity.dp(12))
-    }
-
-    private fun scroll(child: View) = ScrollView(activity).apply { addView(child) }
-
-    private fun column() = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
-
-    private fun gap(parent: LinearLayout, height: Int) {
-        parent.addView(View(activity), LinearLayout.LayoutParams(1, activity.dp(height)))
-    }
+    private fun gap(body: LinearLayout, size: Int) { body.addView(View(activity), LinearLayout.LayoutParams(1, activity.dp(size))) }
 }

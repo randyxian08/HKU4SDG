@@ -66,15 +66,15 @@ object GuideContent {
     }
 
     fun intentUnsupported(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "暂时没有这项引导。请选择上方可用任务。"
-        GuideLanguage.CANTONESE -> "暂时未有呢项引导。请选择上面可用嘅任务。"
-        GuideLanguage.ENGLISH -> "This guide is not available yet. Choose one of the tasks above."
+        GuideLanguage.MANDARIN -> "暂时没有这项引导。请选择下方可用任务。"
+        GuideLanguage.CANTONESE -> "暂时未有呢项引导。请选择下面可用嘅任务。"
+        GuideLanguage.ENGLISH -> "This guide is not available yet. Choose one of the supported tasks below."
     }
 
     fun intentUnavailable(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "AI 暂时不可用。请使用上方已审核的任务卡。"
-        GuideLanguage.CANTONESE -> "AI 暂时用唔到。请用上面已经审核嘅任务卡。"
-        GuideLanguage.ENGLISH -> "AI is unavailable right now. Please use a reviewed task card above."
+        GuideLanguage.MANDARIN -> "AI 暂时不可用。请使用下方可用的任务。"
+        GuideLanguage.CANTONESE -> "AI 暂时用唔到。请用下面可用嘅任务。"
+        GuideLanguage.ENGLISH -> "AI is unavailable right now. Please use a supported task below."
     }
 
     fun intentMatched(language: GuideLanguage) = when (language) {
@@ -244,16 +244,11 @@ class GuidePreferences(private val context: Context) {
         get() = prefs.getBoolean("accessLeft", false)
         set(value) { prefs.edit().putBoolean("accessLeft", value).apply() }
     var appTextScale: Float
-        get() = prefs.getFloat("appTextScale", 1.35f)
+        get() = prefs.getFloat("appTextScale", 1.15f)
         set(value) {
             prefs.edit().putFloat("appTextScale", value).apply()
             Design.appScale = value
         }
-    var speakLanguages: Set<GuideLanguage>
-        get() = (prefs.getStringSet("speakLanguages", emptySet()) ?: emptySet()).mapNotNull { name ->
-            GuideLanguage.entries.firstOrNull { it.name == name }
-        }.toSet()
-        set(value) { prefs.edit().putStringSet("speakLanguages", value.map { it.name }.toSet()).apply() }
 
     fun applyLook(script: DisplayScript) {
         displayScript = script
