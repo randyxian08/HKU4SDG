@@ -29,6 +29,8 @@ class GuideAccessibilityService : AccessibilityService() {
     private var chromeSaveOffered = false
     private var currentSessionId = -1
     private var renderKey: String? = null
+    private var shownBounds: Rect? = null
+    private var receiptVisible = false
     private var hintVisible = false
     private var adjusting = false
     private var toolsExpanded = false
@@ -41,17 +43,20 @@ class GuideAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onServiceConnected() {
-        connected = true
         preferences = GuidePreferences(this)
         overlay = GuideOverlay(this)
         tts = TextToSpeech(this) { ttsReady = it == TextToSpeech.SUCCESS }
         cloudTts = CloudTts(this)
+        connected = true
+        ServiceDiagnostics.record(this, "service_connected")
         preferences.pause(PauseReason.SERVICE_RESTART)
         handler.postDelayed({ if (preferences.active) render(true) }, 300)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!::overlay.isInitialized || !preferences.active) {
+            if (receiptVisible && rootInActiveWindow?.packageName?.toString() in allowedPackages()) return
+            receiptVisible = false
             if (::overlay.isInitialized) overlay.clear()
             tts?.stop()
             cloudTts?.stop()
@@ -92,6 +97,7 @@ class GuideAccessibilityService : AccessibilityService() {
         tts?.stop()
         cloudTts?.stop()
         renderKey = null
+        shownBounds = null
         phoneNodes = emptyList()
     }
 
@@ -134,9 +140,10 @@ class GuideAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        if (::preferences.isInitialized) preferences.pause(PauseReason.SYSTEM_INTERRUPT)
-        clearFeedback()
-        resetTargets()
+        // Android interrupts feedback, including on focus changes. This does not revoke access.
+        ServiceDiagnostics.record(this, "feedback_interrupted")
+        tts?.stop()
+        cloudTts?.stop()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -147,6 +154,9 @@ class GuideAccessibilityService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         connected = false
+        ServiceDiagnostics.record(this, "service_unbound")
+        handler.removeCallbacksAndMessages(null)
+        departureCheck = null
         if (::preferences.isInitialized) preferences.pause(PauseReason.SERVICE_RESTART)
         clearFeedback()
         return super.onUnbind(intent)
@@ -154,8 +164,10 @@ class GuideAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         connected = false
+        ServiceDiagnostics.record(this, "service_destroyed")
         if (::preferences.isInitialized) preferences.pause(PauseReason.SERVICE_RESTART)
         handler.removeCallbacksAndMessages(null)
+        departureCheck = null
         clearFeedback()
         tts?.shutdown()
         cloudTts?.close()
@@ -201,7 +213,7 @@ class GuideAccessibilityService : AccessibilityService() {
                 node.viewIdResourceName.orEmpty(), parent, node.isVisibleToUser, node.isEnabled, node.isClickable,
                 node.className?.toString()?.contains("SeekBar", ignoreCase = true) == true ||
                     node.actionList.any { it.id == AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id },
-                bounds.left, bounds.top, bounds.right, bounds.bottom)
+                bounds.left, bounds.top, bounds.right, bounds.bottom, node.isCheckable)
             repeat(node.childCount) { node.getChild(it)?.let { child -> visit(child, index) } }
         }
         visit(root, -1)
@@ -271,7 +283,58 @@ class GuideAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun automaticBrightnessTarget(root: AccessibilityNodeInfo, automatic: Boolean): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        if (root.packageName?.toString() != SETTINGS_PACKAGE) return null
+        if (TaskAvailability.adaptiveBrightnessAvailable(this) == false) return null
+        val live = mutableListOf<AccessibilityNodeInfo>()
+        val nodes = mutableListOf<SettingsUiNode>()
+        fun visit(node: AccessibilityNodeInfo, parent: Int, depth: Int) {
+            if (depth > 35 || live.size >= 500) return
+            val index = live.size; val b = Rect().also(node::getBoundsInScreen)
+            live += node
+            nodes += SettingsUiNode(text = node.text?.toString().orEmpty(), description = node.contentDescription?.toString().orEmpty(),
+                id = node.viewIdResourceName.orEmpty(), parent = parent, visible = node.isVisibleToUser,
+                enabled = node.isEnabled, clickable = node.isClickable, left = b.left, top = b.top, right = b.right, bottom = b.bottom,
+                checkable = node.isCheckable)
+            repeat(node.childCount) { node.getChild(it)?.let { child -> visit(child, index, depth + 1) } }
+        }
+        visit(root, -1, 0)
+        phoneNodes = nodes.map { it.copy(text = PhoneSettingsMatcher.safeLabel(it.text), description = PhoneSettingsMatcher.safeLabel(it.description)) }
+        val match = PhoneSettingsMatcher.automaticBrightness(nodes) ?: return null
+        phoneLabel = match.label
+        if (match.index != null && BrightnessFlow.action(preferences.brightnessGoal, automatic, false) == BrightnessAction.READY)
+            return GuideStep.BRIGHTNESS_AUTO_COMPLETE to null
+        return match.step to match.index?.let(live::get)
+    }
+
+    private fun previewAreas(root: AccessibilityNodeInfo, step: GuideStep, bounds: Rect?): List<Rect> {
+        if (step.task != GuideTask.FONT_SIZE || step !in setOf(GuideStep.SLIDER, GuideStep.COMPLETE)) return emptyList()
+        val preview = mutableListOf<Rect>()
+        var visited = 0
+        fun visit(node: AccessibilityNodeInfo, depth: Int) {
+            if (depth > 35 || ++visited > 500) return
+            if (node.isVisibleToUser && node.viewIdResourceName?.substringAfterLast('/')?.contains("preview", true) == true)
+                Rect().also(node::getBoundsInScreen).takeIf { it.width() > 0 && it.height() > 0 }?.let(preview::add)
+            repeat(node.childCount) { node.getChild(it)?.let { child -> visit(child, depth + 1) } }
+        }
+        visit(root, 0)
+        if (preview.isNotEmpty()) return preview
+        // OEMs may expose preview text without an ID. Reserve the body above the known slider.
+        val slider = bounds ?: shownBounds ?: return emptyList()
+        val top = dp(100); val bottom = slider.top - dp(24)
+        return if (bottom > top) listOf(Rect(0, top, resources.displayMetrics.widthPixels, bottom)) else emptyList()
+    }
+
     private fun brightnessTarget(root: AccessibilityNodeInfo): Pair<GuideStep, AccessibilityNodeInfo?>? {
+        val mode = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1)
+        if (mode !in 0..1) return null
+        if (preferences.brightnessGoal == BrightnessGoal.ADAPTIVE || mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC) {
+            return automaticBrightnessTarget(root, mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC)
+        }
+        if (!preferences.brightnessBaselineReady) {
+            preferences.initialBrightness = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1)
+            preferences.brightnessBaselineReady = true
+        }
         if (TaskAvailability.experimental(this, GuideTask.SCREEN_BRIGHTNESS)) return phoneTarget(root, GuideTask.SCREEN_BRIGHTNESS)
         val initial = preferences.initialBrightness
         val current = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1)
@@ -353,6 +416,23 @@ class GuideAccessibilityService : AccessibilityService() {
     }
 
     private fun render(force: Boolean = false) {
+        if (!::overlay.isInitialized || !::preferences.isInitialized || !preferences.active) return
+        try { renderSnapshot(force) }
+        catch (error: WindowManager.BadTokenException) { recoverRender(error) }
+        catch (error: IllegalArgumentException) { recoverRender(error) }
+        catch (error: IllegalStateException) { recoverRender(error) }
+        catch (error: SecurityException) { recoverRender(error) }
+    }
+    private fun recoverRender(error: RuntimeException) {
+        ServiceDiagnostics.record(this, "render_rejected", error)
+        clearFeedback()
+        if (!preferences.active) { receiptVisible = false; return }
+        preferences.pause(PauseReason.SYSTEM_INTERRUPT)
+        runCatching { overlay.showPaused(SupportCopy.pauseMessage(PauseReason.SYSTEM_INTERRUPT, preferences.textLanguage),
+            preferences.textLanguage, ::resumeGuide, ::openRecovery, ::requestEnd) }
+            .onFailure { ServiceDiagnostics.record(this, "recovery_window_rejected", it) }
+    }
+    private fun renderSnapshot(force: Boolean = false) {
         Design.appScale = preferences.appTextScale
         Design.displayScript = preferences.displayScript ?: DisplayScript.HANS
         syncSession()
@@ -390,10 +470,8 @@ class GuideAccessibilityService : AccessibilityService() {
             if (!force && key == renderKey) return
             resetTargets()
             renderKey = key
-            try {
-                overlay.showPaused(SupportCopy.pauseMessage(preferences.sessionState.reason, l), l,
-                    ::resumeGuide, ::openRecovery, ::requestEnd)
-            } catch (_: WindowManager.BadTokenException) { clearFeedback() }
+            overlay.showPaused(SupportCopy.pauseMessage(preferences.sessionState.reason, l), l,
+                ::resumeGuide, ::openRecovery, ::requestEnd)
             return
         }
         // Reviewed flows keep their exact selectors. Phone Settings require unique semantic controls.
@@ -410,15 +488,13 @@ class GuideAccessibilityService : AccessibilityService() {
             val unknownKey = "unknown:$currentSessionId:${root.packageName}:${preferences.textLanguage}"
             if (!force && renderKey == unknownKey) return
             renderKey = unknownKey
-            try {
-                overlay.showStatus(if (TaskAvailability.experimental(this, preferences.activeTask))
+            overlay.showStatus(if (preferences.activeTask == GuideTask.SCREEN_BRIGHTNESS &&
+                    (preferences.brightnessGoal == BrightnessGoal.ADAPTIVE || Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1) == 1))
+                    ExperienceCopy.choose(preferences.textLanguage, "没有识别到自动亮度开关，已停止圈画。请返回选择，或复制适配信息；不会自动改变设置。", "未认到自动光度开关，圈画停咗。请返去选择或者复制适配资料；唔会自动改设置。", "Adaptive brightness could not be identified. Return to choose a guide or copy compatibility info. Settings will not be changed automatically.")
+                    else if (TaskAvailability.experimental(this, preferences.activeTask))
                     PhoneGuideCopy.unknown(preferences.activeTask, preferences.textLanguage) else GuideContent.unknown(preferences.textLanguage), preferences.textLanguage,
                     onResume = ::returnToTask, onExit = ::requestEnd,
                     onDiagnostics = if (TaskAvailability.experimental(this, preferences.activeTask)) ::copyPhoneDiagnostics else null)
-            } catch (_: WindowManager.BadTokenException) {
-                overlay.clear()
-                renderKey = null
-            }
             return
         }
         val (step, node) = target
@@ -428,14 +504,27 @@ class GuideAccessibilityService : AccessibilityService() {
             preferences.collapsed = preferences.helpMode == HelpMode.LIGHT
         }
         val bounds = node?.let { Rect().also(it::getBoundsInScreen) }
-        val key = "${preferences.activeTask}:$step:$bounds:$phoneLabel:$phoneAtMaximum:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}:$hintVisible:$adjusting:$toolsExpanded"
-        if (!force && key == renderKey) return
+        // Only a change between circle and directional cue needs new content; scrolling coordinates do not.
+        val indicator = when {
+            bounds == null -> "none"
+            bounds.bottom <= dp(8) -> "above"
+            bounds.top >= resources.displayMetrics.heightPixels - dp(8) -> "below"
+            else -> "visible"
+        }
+        val key = "${preferences.activeTask}:$step:$indicator:$phoneLabel:$phoneAtMaximum:${preferences.textLanguage}:${preferences.voiceLanguage}:${preferences.collapsed}:${preferences.muted}:$hintVisible:$adjusting:$toolsExpanded"
+        val avoid = previewAreas(root, step, bounds)
+        if (!force && key == renderKey) {
+            overlay.updateGeometry(bounds, avoid)
+            if (bounds != null) shownBounds = Rect(bounds)
+            return
+        }
+        if (bounds != null) shownBounds = Rect(bounds)
         shownStep = step
         renderKey = key
-        try {
-            overlay.showStep(
+        overlay.showStep(
                 step = step,
                 bounds = bounds,
+                avoidAreas = avoid,
                 message = if (adjusting && !step.isScrollHint) ExperienceCopy.adjustment(step.task, preferences.textLanguage)
                     else instruction(step, preferences.textLanguage),
                 textLanguage = preferences.textLanguage,
@@ -460,18 +549,17 @@ class GuideAccessibilityService : AccessibilityService() {
                 onMute = { preferences.muted = !preferences.muted; if (preferences.muted) { tts?.stop(); cloudTts?.stop() }; render(true) },
                 onExit = ::requestEnd
             )
-        } catch (_: WindowManager.BadTokenException) {
-            overlay.clear()
-            renderKey = null
-            return
-        }
         if (changedStep && !step.isComplete && preferences.helpMode == HelpMode.FULL) speak(step)
     }
 
     private fun requestEnd() { endConfirming = true; render(true) }
 
     private fun instruction(step: GuideStep, language: GuideLanguage): String =
-        if (TaskAvailability.experimental(this, step.task)) {
+        if (step == GuideStep.BRIGHTNESS_AUTO) {
+            if (preferences.brightnessGoal == BrightnessGoal.ADAPTIVE) ExperienceCopy.choose(language,
+                "请打开圈住的自动亮度开关。", "请开启圈住嘅自动光度开关。", "Turn on the circled adaptive brightness switch.")
+            else ExperienceCopy.choose(language, "先关闭圈住的自动亮度，再调亮度滑块。", "先关闭圈住嘅自动光度，再调滑桿。", "Turn off the circled adaptive brightness switch, then adjust the slider.")
+        } else if (TaskAvailability.experimental(this, step.task)) {
             if (phoneAtMaximum && !step.isComplete && !step.isScrollHint) PhoneGuideCopy.atMaximum(step.task, language)
             else PhoneGuideCopy.instruction(step, phoneLabel, language)
         } else GuideContent.instruction(step, language)
@@ -486,8 +574,9 @@ class GuideAccessibilityService : AccessibilityService() {
             ?: speakOnDevice(message, language, explicit)
     }
 
-    private fun speakOnDevice(message: String, language: GuideLanguage, explicit: Boolean = false) {
-        if ((preferences.muted && !explicit) || !ttsReady || !preferences.sessionState.canConfirm) return
+    private fun speakOnDevice(message: String, language: GuideLanguage, explicit: Boolean = false, receipt: Boolean = false) {
+        if ((preferences.muted && !explicit) || !ttsReady ||
+            (!preferences.sessionState.canConfirm && !(receipt && receiptVisible && rootInActiveWindow?.packageName?.toString() in allowedPackages()))) return
         val engine = tts ?: return
         val locale = language.locale
         val support = engine.isLanguageAvailable(locale)
@@ -511,6 +600,26 @@ class GuideAccessibilityService : AccessibilityService() {
         tts?.stop()
         cloudTts?.stop()
         overlay.clear()
+        receiptVisible = true
+        val confirmed = preferences.records().firstOrNull()?.outcome == PracticeOutcome.CONFIRMED
+        try { overlay.showReceipt(confirmed, preferences.textLanguage,
+            onStay = { receiptVisible = false; preferences.receiptPending = false; tts?.stop(); cloudTts?.stop(); overlay.clear() },
+            onReturn = {
+                receiptVisible = false; tts?.stop(); cloudTts?.stop(); overlay.clear()
+                startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+            }) }
+        catch (error: WindowManager.BadTokenException) { recoverRender(error) }
+        catch (error: IllegalArgumentException) { recoverRender(error) }
+        catch (error: IllegalStateException) { recoverRender(error) }
+        catch (error: SecurityException) { recoverRender(error) }
+        ServiceDiagnostics.record(this, if (confirmed) "guide_confirmed" else "guide_ended_unconfirmed")
+        if (!preferences.muted && preferences.helpMode == HelpMode.FULL) {
+            val language = preferences.voiceLanguage
+            val message = if (confirmed) ExperienceCopy.choose(language, "你已确认完成。可以留在这里，或返回数字扶手。", "你确认完成咗。可以留喺呢度，或者返数字扶手。", "You confirmed completion. Stay here or return to Digital Handrail.")
+                else ExperienceCopy.choose(language, "这次引导已结束，尚未确认完成。可以留在这里，或返回数字扶手。", "今次指引结束咗，未确认完成。可以留喺呢度，或者返数字扶手。", "This guide has ended without confirmation. Stay here or return to Digital Handrail.")
+            cloudTts?.speak(message, language) { speakOnDevice(message, language, receipt = true) }
+                ?: speakOnDevice(message, language, receipt = true)
+        }
     }
 
     private fun openRecovery() {
@@ -522,6 +631,7 @@ class GuideAccessibilityService : AccessibilityService() {
 
     private fun returnToTask() {
         endGuide()
+        receiptVisible = false; preferences.receiptPending = false; overlay.clear()
         startActivity(Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .putExtra("return_to_task", true))
@@ -543,8 +653,6 @@ class GuideAccessibilityService : AccessibilityService() {
                 setOf(GuideStep.SLIDER, GuideStep.BRIGHTNESS_SLIDER)))) { render(true); return }
         preferences.finish(PracticeOutcome.CONFIRMED)
         endGuide()
-        startActivity(Intent(this, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
     }
 
     companion object {

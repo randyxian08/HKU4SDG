@@ -21,7 +21,9 @@ internal class FirstRun(
     private val serviceOn: () -> Boolean,
     private val openAccess: () -> Unit,
     private val onDone: () -> Unit,
-    private val onHome: () -> Unit
+    private val onHome: () -> Unit,
+    private val onSetup: () -> Unit,
+    private val onDiagnostics: () -> Unit
 ) {
     private fun c(zh: String, yue: String, en: String) = ExperienceCopy.choose(preferences.textLanguage, zh, yue, en)
     private fun sync() {
@@ -43,6 +45,10 @@ internal class FirstRun(
         sync()
         page { body ->
             heading(body, c("字和声音", "文字同声音", "Text and voice"))
+            gap(body, 16)
+            body.addView(button(c("引导服务设置", "指引服务设置", "Guide service settings"), false, click = onSetup))
+            gap(body, 10)
+            body.addView(button(c("服务状态与诊断", "服务状态同诊断", "Service status and diagnostics"), false, click = onDiagnostics))
             section(body, c("界面文字与 AI 回复", "界面文字同 AI 提示", "App text and AI replies"))
             languageChoices(body, preferences.textLanguage) { preferences.textLanguage = it; showSettings() }
             section(body, c("中文显示方式", "中文显示方式", "Chinese writing style"))

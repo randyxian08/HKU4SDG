@@ -1,3 +1,5 @@
+import java.time.Instant
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -11,8 +13,11 @@ android {
         applicationId = "org.hku4sdg.handrail"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
+        val revision = providers.exec { commandLine("git", "describe", "--always", "--dirty") }.standardOutput.asText.get().trim()
+        val stamp = Instant.now().toString()
+        buildConfigField("String", "BUILD_ID", "\"$revision/$stamp\"")
         testInstrumentationRunner = "org.hku4sdg.handrail.AccessibilityCheck"
     }
 
@@ -20,6 +25,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    buildFeatures { buildConfig = true }
 }
 
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }

@@ -55,6 +55,7 @@ internal class IntegrationCheck(private val runner: Instrumentation) {
         val result = Bundle(); var code = Activity.RESULT_CANCELED
         try {
             check(!prefs.active)
+            prefs.receiptPending = false
             ui = runner.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
             val info = ui.serviceInfo
             info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
@@ -94,7 +95,7 @@ internal class IntegrationCheck(private val runner: Instrumentation) {
             check(prefs.helpMode == HelpMode.LIGHT && prefs.collapsed)
             tap("更多"); tap("结束，不确认"); tap("结束引导")
             check(!prefs.active && prefs.records().first().outcome == PracticeOutcome.ENDED)
-            home()
+            tap("返回数字扶手"); find("这次引导已结束"); tap("返回首页")
             events += "Typed goal leads to confirmation; light help starts collapsed; exit stays unconfirmed"
             prefs.helpMode = HelpMode.ON_DEMAND; prefs.muted = true
             tap("把字调大"); tap("自己先试试"); tap("打开设置，开始")

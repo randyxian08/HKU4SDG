@@ -4,6 +4,11 @@ import android.content.Context
 import android.os.Build
 
 object TaskAvailability {
+    /** A known platform capability can hide an unavailable choice; unknown OEMs still use live matching. */
+    fun adaptiveBrightnessAvailable(context: Context): Boolean? = runCatching {
+        val id = context.resources.getIdentifier("config_automatic_brightness_available", "bool", "android")
+        if (id == 0) null else context.resources.getBoolean(id)
+    }.getOrNull()
     fun profile(context: Context) = DeviceProfile(Build.VERSION.SDK_INT, Build.HARDWARE, Build.MODEL,
         context.resources.configuration.locales[0].language,
         TaskCatalog.tasks.map { it.packageName }.distinct().mapNotNull { name ->
