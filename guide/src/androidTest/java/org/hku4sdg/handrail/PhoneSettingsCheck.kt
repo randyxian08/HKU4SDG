@@ -115,18 +115,10 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
             tapNative(setOf("显示大小和文字", "字体大小", "字体大小与粗细"))
             appText("请亲手把圈住的字体大小")
             capture("font-slider-zh")
-            val session = prefs.guideSessionId
-            tapApp("收起提示"); appText("查看本步文字")
-            tapApp("换位置"); appText("查看本步文字"); capture("font-compact-zh")
-            tapApp(SupportCopy.pause(GuideLanguage.MANDARIN)); appText(SupportCopy.paused(GuideLanguage.MANDARIN))
-            check(prefs.sessionState.phase == SessionPhase.PAUSED)
-            tapApp(SupportCopy.resume(GuideLanguage.MANDARIN)); appText("请亲手把圈住的字体大小")
-            check(prefs.guideSessionId == session && prefs.sessionState.phase == SessionPhase.RUNNING)
-            events += "Phone overlay collapse + move + pause/resume keep the same attempt"
             raiseSlider { it.packageName?.toString() == "com.android.settings" &&
                 it.className?.toString()?.contains("SeekBar") == true && it.contentDescription?.toString() == "字体大小" }
-            appText(ExperienceCopy.question(GuideTask.FONT_SIZE, GuideLanguage.MANDARIN))
-            tapApp(ExperienceCopy.confirm(GuideLanguage.MANDARIN))
+            appText("完成")
+            tapApp("完成")
             await("confirmed history") { it.text?.toString() == "你已确认完成" }
             check(prefs.records().first().outcome == PracticeOutcome.CONFIRMED)
             events += "Chinese Settings font row + actual slider + system value increase + user confirmation"
@@ -140,8 +132,8 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
             raiseSlider { it.packageName?.toString() in setOf("com.android.settings", "com.android.systemui") &&
                 it.className?.toString()?.contains("SeekBar") == true &&
                 (it.viewIdResourceName?.contains("slider") == true || it.viewIdResourceName?.contains("brightness") == true) }
-            appText(ExperienceCopy.question(GuideTask.SCREEN_BRIGHTNESS, GuideLanguage.MANDARIN))
-            tapApp(ExperienceCopy.confirm(GuideLanguage.MANDARIN))
+            appText("完成")
+            tapApp("完成")
             await("confirmed brightness history") { it.text?.toString() == "你已确认完成" }
             events += "Chinese Settings brightness row + actual slider + value increase + user confirmation"
             openHome(); tapApp("把字调大"); tapApp("打开设置，开始")

@@ -13,15 +13,17 @@ import android.view.View
 import android.widget.TextView
 
 internal object Design {
-    val background = 0xFFF6F4EE.toInt()
+    val background = 0xFFFFFFFF.toInt()
     val surface = 0xFFFFFFFF.toInt()
     val ink = 0xFF173B35.toInt()
-    val secondary = 0xFF56645E.toInt()
+    val secondary = 0xFF173B35.toInt()
     val forest = 0xFF17483E.toInt()
-    val paleGreen = 0xFFE8F1EB.toInt()
-    val orange = 0xFFC25825.toInt()
-    val paleOrange = 0xFFFFEFE5.toInt()
-    val line = 0xFFE4E8E1.toInt()
+    val paleGreen = 0xFFFFFFFF.toInt()
+    val orange = 0xFF173B35.toInt()
+    val paleOrange = 0xFFFFFFFF.toInt()
+    val line = 0xFF173B35.toInt()
+    var appScale = 1.35f
+    var displayScript = DisplayScript.HANS
 
     fun shape(fill: Int, radius: Float, stroke: Int? = null, strokeWidth: Int = 1): GradientDrawable =
         GradientDrawable().apply {
@@ -30,10 +32,10 @@ internal object Design {
             if (stroke != null) setStroke(strokeWidth, stroke)
         }
 
-    fun ripple(fill: Int, radius: Float, stroke: Int? = null): RippleDrawable =
+    fun ripple(fill: Int, radius: Float, stroke: Int? = null, strokeWidth: Int = 1): RippleDrawable =
         RippleDrawable(
             ColorStateList.valueOf(0x2417483E),
-            shape(fill, radius, stroke),
+            shape(fill, radius, stroke, strokeWidth),
             shape(0xFFFFFFFF.toInt(), radius)
         )
 }
@@ -45,13 +47,14 @@ internal fun Context.text(
     size: Float,
     color: Int = Design.ink,
     bold: Boolean = false,
-    gravity: Int = Gravity.START
+    gravity: Int = Gravity.START,
+    convert: Boolean = true
 ): TextView = TextView(this).apply {
-    text = value
-    textSize = size
+    text = if (convert && Design.displayScript == DisplayScript.HANT) Han.convert(value) else value
+    textSize = (size * Design.appScale).coerceAtLeast(18f)
     setTextColor(color)
     this.gravity = gravity
-    includeFontPadding = false
+    includeFontPadding = true
     if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
 }
 

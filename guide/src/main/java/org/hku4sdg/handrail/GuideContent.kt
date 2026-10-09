@@ -3,6 +3,12 @@ package org.hku4sdg.handrail
 import android.content.Context
 import java.util.Locale
 
+enum class DisplayScript { HANS, HANT, EN;
+    companion object {
+        fun fromName(value: String?) = entries.firstOrNull { it.name == value }
+    }
+}
+
 enum class GuideLanguage(val label: String, val tag: String) {
     MANDARIN("普通话", "zh-CN"),
     CANTONESE("粤语", "yue-HK"),
@@ -219,6 +225,40 @@ class GuidePreferences(private val context: Context) {
     var voiceLanguage: GuideLanguage
         get() = language("voice")
         set(value) = setLanguage("voice", value)
+    var displayScript: DisplayScript?
+        get() = DisplayScript.fromName(prefs.getString("displayScript", null))
+        set(value) {
+            prefs.edit().putString("displayScript", value?.name).apply()
+            Design.displayScript = value ?: DisplayScript.HANS
+        }
+    var initStep: Int
+        get() = prefs.getInt("initStep", 0)
+        set(value) { prefs.edit().putInt("initStep", value).apply() }
+    var initDone: Boolean
+        get() = prefs.getBoolean("initDone", false)
+        set(value) { prefs.edit().putBoolean("initDone", value).apply() }
+    var accessAgreed: Boolean
+        get() = prefs.getBoolean("accessAgreed", false)
+        set(value) { prefs.edit().putBoolean("accessAgreed", value).apply() }
+    var accessLeft: Boolean
+        get() = prefs.getBoolean("accessLeft", false)
+        set(value) { prefs.edit().putBoolean("accessLeft", value).apply() }
+    var appTextScale: Float
+        get() = prefs.getFloat("appTextScale", 1.35f)
+        set(value) {
+            prefs.edit().putFloat("appTextScale", value).apply()
+            Design.appScale = value
+        }
+    var speakLanguages: Set<GuideLanguage>
+        get() = (prefs.getStringSet("speakLanguages", emptySet()) ?: emptySet()).mapNotNull { name ->
+            GuideLanguage.entries.firstOrNull { it.name == name }
+        }.toSet()
+        set(value) { prefs.edit().putStringSet("speakLanguages", value.map { it.name }.toSet()).apply() }
+
+    fun applyLook(script: DisplayScript) {
+        displayScript = script
+        textLanguage = if (script == DisplayScript.EN) GuideLanguage.ENGLISH else GuideLanguage.MANDARIN
+    }
 
     private fun language(key: String) = GuideLanguage.fromName(prefs.getString(key, null))
     private fun setLanguage(key: String, value: GuideLanguage) { prefs.edit().putString(key, value.name).apply() }
