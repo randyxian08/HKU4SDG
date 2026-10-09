@@ -1,0 +1,9 @@
+2026-10-09, Android 15 / API 35, sdk_gphone64_arm64 emulator.
+Native platform actions, not a user study or full TalkBack acceptance.
+
+Waiting for service rebind
+
+PASS
+English onboarding; independent input/text/voice; goal input precedes tasks
+Typed goal leads to confirmation; light help starts collapsed; exit stays unconfirmed
+On-demand help, pause/resume, collapse; 13 seconds idle cannot complete; real font increase plus explicit confirmation

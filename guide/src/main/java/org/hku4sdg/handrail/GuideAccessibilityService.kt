@@ -353,6 +353,8 @@ class GuideAccessibilityService : AccessibilityService() {
     }
 
     private fun render(force: Boolean = false) {
+        Design.appScale = preferences.appTextScale
+        Design.displayScript = preferences.displayScript ?: DisplayScript.HANS
         syncSession()
         val root = rootInActiveWindow
         if (root?.packageName?.toString() !in allowedPackages()) {
@@ -447,7 +449,7 @@ class GuideAccessibilityService : AccessibilityService() {
                 onUnavailable = { pauseGuide(PauseReason.NOT_ENOUGH_SPACE) },
                 independent = preferences.helpMode == HelpMode.ON_DEMAND && !hintVisible,
                 adjusting = adjusting,
-                onCollapse = { preferences.collapsed = !preferences.collapsed; render(true) },
+                onCollapse = { preferences.collapsed = !preferences.collapsed; toolsExpanded = false; render(true) },
                 onTextLanguage = { language -> preferences.textLanguage = language; render(true) },
                 onVoiceLanguage = { language -> preferences.voiceLanguage = language; render(true) },
                 onReplay = { speak(step, explicit = true) },

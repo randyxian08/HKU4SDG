@@ -1,0 +1,14 @@
+2026-10-09, Android 15 / API 35, sdk_gphone64_arm64 emulator.
+Native platform actions, not a user study or full TalkBack acceptance.
+
+PASS
+focus + accessible role + >=48dp + click: Make the text larger.
+focus + accessible role + >=48dp + click: Guide details.
+focus + accessible role + >=48dp + click: Back
+focus + accessible role + >=48dp + click: Settings
+focus + accessible role + >=48dp + click: 粤语 · Cantonese
+focus + accessible role + >=48dp + click: 简体中文
+focus + accessible role + >=48dp + click: 普通话 · Mandarin
+focus + accessible role + >=48dp + click: 完成
+focus + accessible role + >=48dp + click: 记录
+Trilingual page refresh; input and voice unchanged; history reachable

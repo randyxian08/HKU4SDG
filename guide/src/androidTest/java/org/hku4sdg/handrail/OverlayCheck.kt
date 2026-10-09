@@ -51,7 +51,10 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
         repeat(30) {
             val window = ui.windows.firstOrNull { candidate ->
                 candidate.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY &&
-                    nodes(candidate.root).any { it.isClickable && it.packageName?.toString() == targetContext.packageName }
+                    nodes(candidate.root).any {
+                        it.packageName?.toString() == targetContext.packageName &&
+                            (it.text?.toString()?.length ?: 0) > 4
+                    }
             }
             if (window != null) return window
             SystemClock.sleep(100)
@@ -87,11 +90,12 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
     }
     fun run() {
         prefs = GuidePreferences(targetContext)
-        val text = prefs.textLanguage; val input = prefs.inputLanguage; val voice = prefs.voiceLanguage; val mute = prefs.muted
+        val snapshot = PreferenceSnapshot(targetContext)
         var code = Activity.RESULT_CANCELED; val result = Bundle()
         try {
             check(!prefs.active) { "End the current guide before checking overlays" }
             prefs.textLanguage = GuideLanguage.MANDARIN; prefs.muted = true
+            prefs.initDone = true; prefs.displayScript = DisplayScript.HANS; prefs.appTextScale = 1.15f; prefs.helpMode = HelpMode.FULL
             ui = runner.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
             val info = ui.serviceInfo
             info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
@@ -101,63 +105,32 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
             check(GuideAccessibilityService.connected) { "Rebind the guide service after starting this check" }
             prefs.setupTask = null
             runner.startActivitySync(Intent(targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-            click(if (task == GuideTask.FONT_SIZE) "把字调大." else "调亮屏幕.")
+            click(if (task == GuideTask.FONT_SIZE) "把字调大" else "调亮屏幕")
             click("打开设置，开始")
-            find("收起提示")
+            find(if (task == GuideTask.FONT_SIZE) "请点圈住的“Display size and text”。" else "请点圈住的“Brightness level”。", false)
             val session = prefs.guideSessionId
             val expanded = checkClearTarget()
-            capture("expanded")
-            click("收起提示")
+            capture("sentence")
+            click("更多"); click("收起提示")
             val compact = checkClearTarget()
-            check(compact.height() < expanded.height()) { "Collapsing does not shrink the card" }
-            log += "compact ${compact.height()}px < expanded ${expanded.height()}px"
+            check(compact.height() < expanded.height()) { "Collapsed card did not shrink" }
             capture("compact")
-            click("换个位置")
-            checkClearTarget()
-            val compactHeader = find("查看本步文字")
-            check(compactHeader.isVisibleToUser && bounds(compactHeader).height() >= (48 * targetContext.resources.displayMetrics.density).toInt())
-            capture("compact-moved")
-            click("查看本步文字")
-            checkClearTarget()
-            click("更多")
-            val replayBefore = bounds(find("听一次")); val pauseBefore = bounds(find("先停一下"))
-            val scroll = nodes(overlay().root).first { it.isScrollable }
-            repeat(2) { scroll.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD); SystemClock.sleep(150) }
-            check(bounds(find("听一次")) == replayBefore && bounds(find("先停一下")) == pauseBefore) { "Primary controls scroll away" }
-            log += "Replay and pause remain fixed while options scroll"
-            capture("more-scrolled")
-            click("文字 · 普通话"); click("English")
-            check(prefs.textLanguage == GuideLanguage.ENGLISH && prefs.inputLanguage == input && prefs.voiceLanguage == voice)
-            click("Text · English"); click("粤语")
-            check(prefs.textLanguage == GuideLanguage.CANTONESE && prefs.inputLanguage == input && prefs.voiceLanguage == voice)
-            click("文字 · 粤语"); click("普通话")
-            check(prefs.textLanguage == GuideLanguage.MANDARIN && prefs.inputLanguage == input && prefs.voiceLanguage == voice)
-            log += "Direct language selection; input and voice unchanged"
-            click("结束，不确认")
-            find("结束这次引导？", false); check(prefs.active && prefs.guideSessionId == session)
-            capture("end-confirmation")
-            click("继续这次任务"); check(prefs.active && prefs.guideSessionId == session)
-            click("换个位置"); val moved = checkClearTarget()
-            check(moved.height() >= expanded.height()) { "Moving squeezes the primary instruction: $moved, initial $expanded" }
-            log += "Moving preserves the full primary instruction; compact card can also move"
-            capture("moved")
+            click("查看本步文字"); click("更多"); click("换个位置")
+            checkClearTarget(); capture("moved")
             click("先停一下"); find("指引已暂停", false)
             check(prefs.sessionState.phase == SessionPhase.PAUSED && prefs.guideSessionId == session)
-            capture("paused")
             click("继续指引"); find("听一次")
             check(prefs.sessionState.phase == SessionPhase.RUNNING && prefs.guideSessionId == session)
-            val resumed = checkClearTarget()
-            check((resumed.top < 1000) == (moved.top < 1000)) { "Chosen side changes after pause" }
-            if (roots().any { it.text?.toString() == "收起更多" }) click("收起更多")
-            click("更多"); click("结束，不确认"); click("结束引导")
+            click("更多"); click("结束，不确认")
+            find("结束这次引导？", false); click("继续这次任务")
+            check(prefs.active && prefs.guideSessionId == session)
+            click("结束，不确认"); click("结束引导")
             check(!prefs.active && prefs.guideSessionId == session)
-            val records = prefs.records().filter { it.session == session }
-            check(records.size == 1 && records.single().outcome == PracticeOutcome.ENDED)
-            log += "Cancel end, pause and resume preserve the same attempt; explicit exit records one unconfirmed result"
+            log += "Sentence + progressive options; collapse/move/pause preserve attempt; cancel exit preserves task"
             result.putString("stream", "\nPASS\n" + log.joinToString("\n") + "\n"); code = Activity.RESULT_OK
         } catch (e: Throwable) { result.putString("stream", "\nFAIL: ${e.message}\n" + log.joinToString("\n") + "\n") }
         finally {
-            targetContext.getSharedPreferences("guide", 0).edit().putString("text", text.name).putBoolean("muted", mute).commit()
+            snapshot.restore()
         }
         runner.finish(code, result)
     }

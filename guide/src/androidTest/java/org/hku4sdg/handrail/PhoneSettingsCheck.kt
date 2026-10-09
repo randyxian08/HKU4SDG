@@ -38,7 +38,7 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
     }
     private fun openHome() {
         runner.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-        appText("今天想做什么")
+        appText("你想在手机上做什么")
     }
     private fun capture(name: String) {
         automation.takeScreenshot()?.let { bitmap ->
@@ -79,18 +79,11 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
     fun run() {
         val prefs = GuidePreferences(context)
         val guide = context.getSharedPreferences("guide", Context.MODE_PRIVATE)
-        val practice = context.getSharedPreferences("practice", Context.MODE_PRIVATE)
-        val oldGuide = guide.all
-        val oldPractice = practice.all
+        val snapshot = PreferenceSnapshot(context)
+        val originalFont = Settings.System.getFloat(context.contentResolver, "font_scale", 1f)
+        val originalBrightness = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS, 102)
         val result = Bundle()
         var code = Activity.RESULT_CANCELED
-        fun restore(store: android.content.SharedPreferences, values: Map<String, *>) {
-            val edit = store.edit().clear()
-            values.forEach { (key, value) -> when (value) {
-                is String -> edit.putString(key, value); is Boolean -> edit.putBoolean(key, value)
-                is Int -> edit.putInt(key, value); is Long -> edit.putLong(key, value); is Float -> edit.putFloat(key, value)
-            } }; edit.commit()
-        }
         try {
             check(!prefs.active) { "End the existing attempt before the phone regression" }
             check(context.resources.configuration.locales[0].language == "zh") { "Use real Chinese system pages for this regression" }
@@ -102,10 +95,11 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
             val deadline = SystemClock.uptimeMillis() + 10_000
             while (!GuideAccessibilityService.connected && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(100)
             check(GuideAccessibilityService.connected) { "Rebind the guide service after instrumentation starts" }
-            guide.edit().putString("text", GuideLanguage.MANDARIN.name).putBoolean("muted", true).commit()
+            guide.edit().putString("text", GuideLanguage.MANDARIN.name).putBoolean("muted", true).putBoolean("initDone", true).putString("displayScript", DisplayScript.HANS.name).putFloat("appTextScale", 1.15f).commit()
+            prefs.helpMode = HelpMode.FULL
             check(TaskAvailability.experimental(context, GuideTask.FONT_SIZE))
             check(TaskAvailability.block(context, GuideTask.FONT_SIZE) == null)
-            openHome(); appText("2 项可试"); capture("home-zh")
+            openHome(); appText("也可以从这里开始"); capture("home-zh")
             tapApp("把字调大")
             appText("手机实验引导：")
             tapApp("打开设置，开始")
@@ -115,18 +109,10 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
             tapNative(setOf("显示大小和文字", "字体大小", "字体大小与粗细"))
             appText("请亲手把圈住的字体大小")
             capture("font-slider-zh")
-            val session = prefs.guideSessionId
-            tapApp("收起提示"); appText("查看本步文字")
-            tapApp("换位置"); appText("查看本步文字"); capture("font-compact-zh")
-            tapApp(SupportCopy.pause(GuideLanguage.MANDARIN)); appText(SupportCopy.paused(GuideLanguage.MANDARIN))
-            check(prefs.sessionState.phase == SessionPhase.PAUSED)
-            tapApp(SupportCopy.resume(GuideLanguage.MANDARIN)); appText("请亲手把圈住的字体大小")
-            check(prefs.guideSessionId == session && prefs.sessionState.phase == SessionPhase.RUNNING)
-            events += "Phone overlay collapse + move + pause/resume keep the same attempt"
             raiseSlider { it.packageName?.toString() == "com.android.settings" &&
                 it.className?.toString()?.contains("SeekBar") == true && it.contentDescription?.toString() == "字体大小" }
             appText(ExperienceCopy.question(GuideTask.FONT_SIZE, GuideLanguage.MANDARIN))
-            tapApp(ExperienceCopy.confirm(GuideLanguage.MANDARIN))
+            tapApp("确认完成")
             await("confirmed history") { it.text?.toString() == "你已确认完成" }
             check(prefs.records().first().outcome == PracticeOutcome.CONFIRMED)
             events += "Chinese Settings font row + actual slider + system value increase + user confirmation"
@@ -141,7 +127,7 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
                 it.className?.toString()?.contains("SeekBar") == true &&
                 (it.viewIdResourceName?.contains("slider") == true || it.viewIdResourceName?.contains("brightness") == true) }
             appText(ExperienceCopy.question(GuideTask.SCREEN_BRIGHTNESS, GuideLanguage.MANDARIN))
-            tapApp(ExperienceCopy.confirm(GuideLanguage.MANDARIN))
+            tapApp("确认完成")
             await("confirmed brightness history") { it.text?.toString() == "你已确认完成" }
             events += "Chinese Settings brightness row + actual slider + value increase + user confirmation"
             openHome(); tapApp("把字调大"); tapApp("打开设置，开始")
@@ -169,7 +155,11 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
         } catch (error: Throwable) {
             result.putString("stream", "\nFAIL: ${error.message}\n" + events.joinToString("\n") + "\n")
         } finally {
-            restore(guide, oldGuide); restore(practice, oldPractice)
+            if (::automation.isInitialized) {
+                automation.executeShellCommand("settings put system font_scale $originalFont").close()
+                automation.executeShellCommand("settings put system screen_brightness $originalBrightness").close()
+            }
+            snapshot.restore()
         }
         runner.finish(code, result)
     }

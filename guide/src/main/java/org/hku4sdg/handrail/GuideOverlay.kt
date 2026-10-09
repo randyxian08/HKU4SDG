@@ -3,6 +3,7 @@ package org.hku4sdg.handrail
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
@@ -19,34 +20,37 @@ import android.widget.Toast
 internal class GuideOverlay(private val service: AccessibilityService) {
     private val wm = service.getSystemService(WindowManager::class.java)
     private var ring: View? = null
+    private var arrow: View? = null
     private var card: View? = null
     private var preferred: OverlaySide? = null
     private var lastSide = OverlaySide.BOTTOM
     private var moveRequested = false
-    private var picker: String? = null
     private var onNoRoom: (() -> Unit)? = null
     private fun dp(value: Int) = service.dp(value)
     private fun c(l: GuideLanguage, zh: String, yue: String, en: String) = ExperienceCopy.choose(l, zh, yue, en)
-    fun resetPosition() { preferred = null; picker = null; moveRequested = false }
+    fun resetPosition() { preferred = null; moveRequested = false }
     fun move() { preferred = if (lastSide == OverlaySide.TOP) OverlaySide.BOTTOM else OverlaySide.TOP; moveRequested = true }
     fun clear() {
         ring?.let { runCatching { wm.removeViewImmediate(it) } }
+        arrow?.let { runCatching { wm.removeViewImmediate(it) } }
         card?.let { runCatching { wm.removeViewImmediate(it) } }
-        ring = null; card = null
+        ring = null; arrow = null; card = null
     }
     private fun column() = LinearLayout(service).apply { orientation = LinearLayout.VERTICAL }
     private fun gap(parent: LinearLayout, h: Int = 8) { parent.addView(View(service), LinearLayout.LayoutParams(1, dp(h))) }
     private fun label(value: String, size: Float, color: Int = Design.ink, bold: Boolean = false) = service.text(value, size, color, bold)
-    private fun tap(value: String, fill: Int = Design.paleGreen, color: Int = Design.forest, click: () -> Unit) =
-        label(value, 16f, color, true).apply {
-            gravity = Gravity.CENTER; minHeight = dp(48); minWidth = dp(48)
-            setPadding(dp(12), dp(10), dp(12), dp(10)); isFocusable = true
+    private fun tap(value: String, fill: Int = Design.surface, color: Int = Design.ink, click: () -> Unit) =
+        label(value, 16f, if (fill == Design.forest) Design.surface else color, true).apply {
+            gravity = Gravity.CENTER; minHeight = dp(52); minWidth = dp(48)
+            setPadding(dp(12), dp(12), dp(12), dp(12)); isFocusable = true
             accessibilityDelegate = object : View.AccessibilityDelegate() {
                 override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
                     super.onInitializeAccessibilityNodeInfo(host, info); info.className = android.widget.Button::class.java.name
                 }
             }
-            background = Design.ripple(fill, dp(14).toFloat()); setOnClickListener { click() }
+            background = if (fill == Design.forest) Design.ripple(Design.forest, dp(14).toFloat())
+                else Design.ripple(Design.surface, dp(14).toFloat(), Design.line, dp(1))
+            setOnClickListener { click() }
         }
     private fun pair(parent: LinearLayout, left: View, right: View) {
         parent.addView(LinearLayout(service).apply {
@@ -55,6 +59,7 @@ internal class GuideOverlay(private val service: AccessibilityService) {
             addView(right, LinearLayout.LayoutParams(0, -2, 1f))
         })
     }
+    private var picker: String? = null
     fun showStep(step: GuideStep, bounds: Rect?, message: String,
         textLanguage: GuideLanguage, voiceLanguage: GuideLanguage,
         collapsed: Boolean, muted: Boolean, independent: Boolean, adjusting: Boolean,
@@ -65,82 +70,70 @@ internal class GuideOverlay(private val service: AccessibilityService) {
         clear()
         val l = textLanguage
         onNoRoom = onUnavailable
-        if (bounds != null && (!independent || adjusting || step.isComplete)) addRing(bounds, step)
-        val content = column(); val controls = column()
+        val screenHeight = service.resources.displayMetrics.heightPixels
+        val offTop = bounds != null && bounds.bottom <= dp(8)
+        val offBottom = bounds != null && bounds.top >= screenHeight - dp(8)
+        val showArrow = step.isScrollHint || offTop || offBottom
+        val pointDown = !offTop
+        if (!independent || adjusting || step.isComplete) {
+            if (showArrow) {
+                val words = if (pointDown) c(l, "向上滑，下面还有", "向上扫，下面仲有", "Swipe up. More is below.")
+                    else c(l, "向下滑，上面还有", "向下扫，上面仲有", "Swipe down. More is above.")
+                addArrow(pointDown, if (Design.displayScript == DisplayScript.HANT) Han.convert(words) else words)
+            } else if (bounds != null) addRing(bounds)
+        }
+        val content = column()
+        val controls = column()
+        val mandatory = step.isComplete || step.isScrollHint || adjusting
         if (step.isComplete) {
-            content.addView(label(ExperienceCopy.status(l), 14f, Design.forest, true))
-            gap(content, 12); content.addView(label(ExperienceCopy.question(step.task, l), 22f, bold = true).heading())
-            controls.addView(tap(ExperienceCopy.confirm(l), Design.forest, Design.surface, onConfirm))
-            if (step.task in setOf(GuideTask.FONT_SIZE, GuideTask.SCREEN_BRIGHTNESS)) {
-                gap(controls); controls.addView(tap(ExperienceCopy.adjust(l), click = onAdjust))
-            }
-            gap(controls); pair(controls, tap(SupportCopy.pause(l), click = onPause),
-                tap(ExperienceCopy.unconfirmed(l), Design.background, Design.secondary, onExit))
-            showCard(content, controls, bounds, l); return
-        }
-        if (independent && !adjusting) {
-            content.addView(label(ExperienceCopy.own(l), 19f, bold = true))
-            controls.addView(tap(ExperienceCopy.hint(l), Design.forest, Design.surface, onHint))
-            gap(controls); pair(controls, tap(SupportCopy.pause(l), click = onPause), tap(ExperienceCopy.end(l), Design.background, Design.secondary, onExit))
-            showCard(content, controls, bounds, l); return
-        }
-        val total = if (step.task == GuideTask.CHROME_BOOKMARK) 3 else 2
-        val header = LinearLayout(service).apply { gravity = Gravity.CENTER_VERTICAL }
-        header.addView(label(c(l, "第 ${step.number} / $total 步", "第 ${step.number} / $total 步", "Step ${step.number} / $total"), 14f, Design.forest, true), LinearLayout.LayoutParams(0, -2, 1f))
-        if (!step.isScrollHint) header.addView(tap(if (collapsed) c(l, "查看本步文字", "睇本步文字", "Show step text") else c(l, "收起提示", "收起提示", "Collapse"), click = onCollapse).apply {
-            if (Build.VERSION.SDK_INT >= 30) stateDescription = c(l, if (collapsed) "已收起" else "已展开", if (collapsed) "已收起" else "已展开", if (collapsed) "Collapsed" else "Expanded")
-        }, LinearLayout.LayoutParams(0, -2, 1.65f))
-        content.addView(header)
-        if (!collapsed || step.isScrollHint) {
-            gap(content, 12)
-            content.addView(label(message, 21f, bold = true).apply {
-                setLineSpacing(dp(3).toFloat(), 1f); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            content.addView(label(ExperienceCopy.question(step.task, l), 20f, bold = true).heading())
+        } else if (independent && !adjusting) {
+            content.addView(label(ExperienceCopy.own(l), 18f))
+        } else if (!collapsed || mandatory) {
+            content.addView(label(message, 18f, bold = true).apply {
+                setLineSpacing(dp(3).toFloat(), 1f)
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             })
         }
         val primaryChildCount = content.childCount
-        if (toolsExpanded && !collapsed) {
-            gap(content, 16); content.addView(label(c(l, "语言和声音", "语言同声音", "Language and sound"), 16f, Design.forest, true).heading())
+        if (toolsExpanded) {
+            gap(content, 12)
+            if (!mandatory && !independent) {
+                content.addView(tap(if (collapsed) c(l, "查看本步文字", "睇本步文字", "Show step text") else c(l, "收起提示", "收起提示", "Collapse"), click = onCollapse))
+                gap(content)
+            }
+            pair(content, tap(SupportCopy.pause(l), click = onPause), tap(c(l, "换个位置", "换个位", "Move card"), click = onMove))
+            gap(content)
+            content.addView(tap(SupportCopy.sound(l, muted), click = onMute))
             gap(content)
             content.addView(tap("${SupportCopy.text(l)} · ${textLanguage.label}") { picker = if (picker == "text") null else "text"; onRefresh() })
             if (picker == "text") languageChoices(content, textLanguage, onTextLanguage)
             gap(content)
             content.addView(tap("${SupportCopy.voice(l)} · ${voiceLanguage.label}") { picker = if (picker == "voice") null else "voice"; onRefresh() })
             if (picker == "voice") languageChoices(content, voiceLanguage, onVoiceLanguage)
-            gap(content); content.addView(tap(SupportCopy.sound(l, muted), Design.background, Design.ink, onMute))
-            gap(content); content.addView(tap(ExperienceCopy.unconfirmed(l), Design.background, Design.secondary, onExit))
+            if (step.isComplete && step.task in setOf(GuideTask.FONT_SIZE, GuideTask.SCREEN_BRIGHTNESS)) {
+                gap(content); content.addView(tap(ExperienceCopy.adjust(l), click = onAdjust))
+            }
+            gap(content); content.addView(tap(ExperienceCopy.unconfirmed(l), click = onExit))
         }
-        val replay = tap(if (muted) c(l, "听一次", "听一次", "Play once") else SupportCopy.replay(l), Design.forest, Design.surface, onReplay)
-        val pause = tap(SupportCopy.pause(l), click = onPause)
-        if (collapsed) {
-            replay.text = if (muted) c(l, "听一次", "听一次", "Play") else c(l, "再听", "再听", "Replay")
-            replay.contentDescription = if (muted) c(l, "听一次", "听一次", "Play once") else SupportCopy.replay(l)
-            pause.text = c(l, "暂停", "暂停", "Pause")
-            pause.contentDescription = SupportCopy.pause(l)
-            controls.addView(LinearLayout(service).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                val move = tap(c(l, "换位置", "换位", "Move"), Design.surface, Design.forest, onMove).apply {
-                    contentDescription = c(l, "换个位置", "换个位", "Move card")
-                }
-                listOf(replay, pause, move).forEachIndexed { index, button ->
-                    if (index > 0) addView(View(service), LinearLayout.LayoutParams(dp(6), 1))
-                    addView(button, LinearLayout.LayoutParams(0, -2, 1f))
-                }
-            })
-        } else pair(controls, replay, pause)
-        if (!collapsed) {
-            gap(controls, 6)
-            pair(controls, tap(if (toolsExpanded) c(l, "收起更多", "收起更多", "Close options") else c(l, "更多", "更多", "More"), Design.surface, Design.forest) { picker = null; onTools() }.apply {
-                if (Build.VERSION.SDK_INT >= 30) stateDescription = c(l, if (toolsExpanded) "已展开" else "已收起", if (toolsExpanded) "已展开" else "已收起", if (toolsExpanded) "Expanded" else "Collapsed")
-            }, tap(c(l, "换个位置", "换个位", "Move card"), Design.surface, Design.forest, onMove))
+        val options = tap(if (toolsExpanded) c(l, "收起更多", "收起更多", "Close options") else c(l, "更多", "更多", "More")) { picker = null; onTools() }
+        when {
+            step.isComplete || adjusting -> {
+                controls.addView(tap(ExperienceCopy.confirm(l), Design.forest, Design.surface, onConfirm))
+                gap(controls, 6); pair(controls, tap(SupportCopy.replay(l), click = onReplay), options)
+            }
+            independent -> pair(controls, tap(ExperienceCopy.hint(l), Design.forest, Design.surface, onHint), options)
+            collapsed && !mandatory -> pair(controls, tap(c(l, "查看本步文字", "睇本步文字", "Show step text"), click = onCollapse), options)
+            else -> pair(controls, tap(if (muted) c(l, "听一次", "听一次", "Play once") else SupportCopy.replay(l), click = onReplay), options)
         }
-        if (adjusting) { gap(controls); controls.addView(tap(ExperienceCopy.confirm(l), Design.forest, Design.surface, onConfirm)) }
-        showCard(content, controls, bounds, l, primaryChildCount)
+        val avoid = if (!showArrow) bounds else if (pointDown)
+            Rect(0, screenHeight - dp(8), 1, screenHeight) else Rect(0, 0, 1, dp(88))
+        showCard(content, controls, avoid, l, primaryChildCount)
     }
     private fun languageChoices(parent: LinearLayout, selected: GuideLanguage, change: (GuideLanguage) -> Unit) {
         GuideLanguage.entries.forEach { language ->
             gap(parent, 6)
-            parent.addView(tap(language.label, if (selected == language) Design.forest else Design.background,
-                if (selected == language) Design.surface else Design.ink) { picker = null; change(language) }.apply {
+            parent.addView(tap(language.label, if (selected == language) Design.forest else Design.surface) { picker = null; change(language) }.apply {
                 accessibilityDelegate = object : View.AccessibilityDelegate() {
                     override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
                         super.onInitializeAccessibilityNodeInfo(host, info)
@@ -191,7 +184,8 @@ internal class GuideOverlay(private val service: AccessibilityService) {
             insets = Rect(0, dp(32), 0, dp(32))
         }
         val width = frame.width() - insets.left - insets.right - dp(24)
-        content.setPadding(dp(18), dp(14), dp(18), dp(8)); controls.setPadding(dp(18), dp(8), dp(18), dp(12))
+        if (content.childCount == 0) content.setPadding(0, 0, 0, 0) else content.setPadding(dp(18), dp(14), dp(18), dp(8))
+        if (controls.childCount == 0) controls.setPadding(0, 0, 0, 0) else controls.setPadding(dp(18), dp(8), dp(18), dp(12))
         val spec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
         val free = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         content.measure(spec, free); controls.measure(spec, free)
@@ -207,6 +201,7 @@ internal class GuideOverlay(private val service: AccessibilityService) {
                 bounds?.top, bounds?.bottom, dp(30), desired, minimum, preferred)
         if (position == null) {
             ring?.let { runCatching { wm.removeViewImmediate(it) } }; ring = null
+            arrow?.let { runCatching { wm.removeViewImmediate(it) } }; arrow = null
             onNoRoom?.invoke()
             return
         }
@@ -224,22 +219,15 @@ internal class GuideOverlay(private val service: AccessibilityService) {
         }
         wm.addView(container, params); card = container
     }
-    private fun addRing(bounds: Rect, step: GuideStep) {
+    private fun addRing(bounds: Rect) {
         val padding = dp(15)
         val view = object : View(service) {
             val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Design.orange
+                color = Design.forest
                 style = Paint.Style.STROKE
-                strokeWidth = dp(3).toFloat()
+                strokeWidth = dp(8).toFloat()
             }
-            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AC25825 }
-            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.orange }
-            val badgeText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Design.surface
-                textSize = dp(13).toFloat()
-                textAlign = Paint.Align.CENTER
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-            }
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x2217483E }
             override fun onDraw(canvas: Canvas) {
                 super.onDraw(canvas)
                 val left = padding.toFloat()
@@ -248,10 +236,6 @@ internal class GuideOverlay(private val service: AccessibilityService) {
                 val bottom = (height - padding).toFloat()
                 canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), fill)
                 canvas.drawRoundRect(left, top, right, bottom, dp(15).toFloat(), dp(15).toFloat(), stroke)
-                if (!step.isComplete) {
-                    canvas.drawCircle(left, top, dp(14).toFloat(), badge)
-                    canvas.drawText(step.number.toString(), left, top - (badgeText.ascent() + badgeText.descent()) / 2, badgeText)
-                }
             }
         }
         view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -273,5 +257,59 @@ internal class GuideOverlay(private val service: AccessibilityService) {
         ring = view
     }
 
-
+    private fun addArrow(pointDown: Boolean, caption: String) {
+        val view = object : View(service) {
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.forest }
+            val chip = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Design.surface }
+            val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Design.forest
+                style = Paint.Style.STROKE
+                strokeWidth = dp(3).toFloat()
+            }
+            val words = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Design.forest
+                textSize = dp(22).toFloat()
+                textAlign = Paint.Align.LEFT
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            override fun onDraw(canvas: Canvas) {
+                super.onDraw(canvas)
+                val radius = dp(16).toFloat()
+                canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), radius, radius, chip)
+                canvas.drawRoundRect(dp(2).toFloat(), dp(2).toFloat(), (width - dp(2)).toFloat(), (height - dp(2)).toFloat(), radius, radius, edge)
+                val path = Path()
+                val cx = dp(36).toFloat()
+                val cy = height / 2f
+                if (pointDown) {
+                    path.moveTo(cx - dp(16), cy - dp(12))
+                    path.lineTo(cx + dp(16), cy - dp(12))
+                    path.lineTo(cx, cy + dp(16))
+                } else {
+                    path.moveTo(cx - dp(16), cy + dp(12))
+                    path.lineTo(cx + dp(16), cy + dp(12))
+                    path.lineTo(cx, cy - dp(16))
+                }
+                path.close()
+                canvas.drawPath(path, fill)
+                canvas.drawText(caption, dp(68).toFloat(), height / 2f - (words.ascent() + words.descent()) / 2f, words)
+            }
+        }
+        view.contentDescription = caption
+        view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        val screenWidth = service.resources.displayMetrics.widthPixels
+        val screenHeight = service.resources.displayMetrics.heightPixels
+        val width = (screenWidth - dp(24)).coerceAtMost(dp(420))
+        val height = dp(72)
+        val params = WindowManager.LayoutParams(width, height,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = (screenWidth - width) / 2
+            y = if (pointDown) screenHeight - height - dp(24) else dp(24)
+        }
+        wm.addView(view, params)
+        arrow = view
+    }
 }

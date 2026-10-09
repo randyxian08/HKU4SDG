@@ -3,6 +3,12 @@ package org.hku4sdg.handrail
 import android.content.Context
 import java.util.Locale
 
+enum class DisplayScript { HANS, HANT, EN;
+    companion object {
+        fun fromName(value: String?) = entries.firstOrNull { it.name == value }
+    }
+}
+
 enum class GuideLanguage(val label: String, val tag: String) {
     MANDARIN("普通话", "zh-CN"),
     CANTONESE("粤语", "yue-HK"),
@@ -60,15 +66,15 @@ object GuideContent {
     }
 
     fun intentUnsupported(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "暂时没有这项引导。请选择上方可用任务。"
-        GuideLanguage.CANTONESE -> "暂时未有呢项引导。请选择上面可用嘅任务。"
-        GuideLanguage.ENGLISH -> "This guide is not available yet. Choose one of the tasks above."
+        GuideLanguage.MANDARIN -> "暂时没有这项引导。请选择下方可用任务。"
+        GuideLanguage.CANTONESE -> "暂时未有呢项引导。请选择下面可用嘅任务。"
+        GuideLanguage.ENGLISH -> "This guide is not available yet. Choose one of the supported tasks below."
     }
 
     fun intentUnavailable(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "AI 暂时不可用。请使用上方已审核的任务卡。"
-        GuideLanguage.CANTONESE -> "AI 暂时用唔到。请用上面已经审核嘅任务卡。"
-        GuideLanguage.ENGLISH -> "AI is unavailable right now. Please use a reviewed task card above."
+        GuideLanguage.MANDARIN -> "AI 暂时不可用。请使用下方可用的任务。"
+        GuideLanguage.CANTONESE -> "AI 暂时用唔到。请用下面可用嘅任务。"
+        GuideLanguage.ENGLISH -> "AI is unavailable right now. Please use a supported task below."
     }
 
     fun intentMatched(language: GuideLanguage) = when (language) {
@@ -219,6 +225,35 @@ class GuidePreferences(private val context: Context) {
     var voiceLanguage: GuideLanguage
         get() = language("voice")
         set(value) = setLanguage("voice", value)
+    var displayScript: DisplayScript?
+        get() = DisplayScript.fromName(prefs.getString("displayScript", null))
+        set(value) {
+            prefs.edit().putString("displayScript", value?.name).apply()
+            Design.displayScript = value ?: DisplayScript.HANS
+        }
+    var initStep: Int
+        get() = prefs.getInt("initStep", 0)
+        set(value) { prefs.edit().putInt("initStep", value).apply() }
+    var initDone: Boolean
+        get() = prefs.getBoolean("initDone", false)
+        set(value) { prefs.edit().putBoolean("initDone", value).apply() }
+    var accessAgreed: Boolean
+        get() = prefs.getBoolean("accessAgreed", false)
+        set(value) { prefs.edit().putBoolean("accessAgreed", value).apply() }
+    var accessLeft: Boolean
+        get() = prefs.getBoolean("accessLeft", false)
+        set(value) { prefs.edit().putBoolean("accessLeft", value).apply() }
+    var appTextScale: Float
+        get() = prefs.getFloat("appTextScale", 1.15f)
+        set(value) {
+            prefs.edit().putFloat("appTextScale", value).apply()
+            Design.appScale = value
+        }
+
+    fun applyLook(script: DisplayScript) {
+        displayScript = script
+        textLanguage = if (script == DisplayScript.EN) GuideLanguage.ENGLISH else GuideLanguage.MANDARIN
+    }
 
     private fun language(key: String) = GuideLanguage.fromName(prefs.getString(key, null))
     private fun setLanguage(key: String, value: GuideLanguage) { prefs.edit().putString(key, value.name).apply() }
