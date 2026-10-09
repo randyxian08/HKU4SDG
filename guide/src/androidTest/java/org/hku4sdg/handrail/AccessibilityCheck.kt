@@ -12,12 +12,14 @@ import java.io.File
 
 /** Checks platform accessibility actions with services kept running. This is not a gesture/user study. */
 class AccessibilityCheck : Instrumentation() {
+    private var argumentsCheck: String? = null
     private lateinit var automation: UiAutomation
     private val events = mutableListOf<String>()
     private var overlayTask: GuideTask? = null
     private var phoneCheck = false
     private var integrationCheck = false
     override fun onCreate(arguments: Bundle?) {
+        argumentsCheck = arguments?.getString("check")
         integrationCheck = arguments?.getString("check") == "integration"
         phoneCheck = arguments?.getString("check") == "phone"
         if (arguments?.getString("check") == "overlay") overlayTask =
@@ -75,6 +77,7 @@ class AccessibilityCheck : Instrumentation() {
         }
     }
     override fun onStart() {
+        if (argumentsCheck == "reliability") { ReliabilityCheck(this).run(); return }
         if (integrationCheck) { IntegrationCheck(this).run(); return }
         if (phoneCheck) { PhoneSettingsCheck(this).run(); return }
         overlayTask?.let { OverlayCheck(this, it).run(); return }
@@ -86,6 +89,7 @@ class AccessibilityCheck : Instrumentation() {
         var code = Activity.RESULT_CANCELED
         try {
             check(!prefs.active) { "End the existing attempt before the accessibility check" }
+            prefs.receiptPending = false
             check((targetContext.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as
                 android.view.accessibility.AccessibilityManager).isTouchExplorationEnabled) {
                 "Enable TalkBack before checking screen-reader focus"

@@ -48,7 +48,7 @@ object SupportCopy {
     fun setupPrivacy(l: GuideLanguage) = c(l, "Android 会提示这项权限可读取屏幕并执行操作。数字扶手只匹配支持任务的必要控件，不代点，也不上传屏幕。你可随时在系统设置关闭。", "Android 会提示呢项权限可以读取屏幕同执行操作。数字扶手只配对支持任务要用嘅控件，唔代㩒，亦唔上传屏幕。你随时可以喺系统设置关闭。", "Android warns that this permission can read the screen and perform actions. Digital Handrail matches controls for supported tasks, never taps for you, and never uploads the screen. You can turn it off in Settings.")
     fun setupSteps(l: GuideLanguage) = listOf(
         c(l, "在系统页面选“数字扶手 · 手机引导”", "喺系统页面拣「数字扶手 · 手机引导」", "Choose “数字扶手 · 手机引导” in Settings"),
-        c(l, "打开“Use”开关，阅读并确认 Android 提示", "开启「Use」掣，睇同确认 Android 提示", "Turn on “Use”, then read and confirm Android's prompt"),
+        c(l, "打开该服务的开关，阅读并确认系统提示", "开启服务嘅开关，睇同确认系统提示", "Turn on this service, then read and confirm Android's prompt"),
         c(l, "用系统返回键回到这里，再选择开始", "用系统返回掣返嚟，再选择开始", "Use Back to return here, then choose to start")
     )
     fun openSettings(l: GuideLanguage) = c(l, "去系统设置开启", "去系统设置开启", "Open Settings")

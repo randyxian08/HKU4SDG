@@ -5,6 +5,23 @@ import org.junit.Test
 
 /** Synthetic control structures exercise ambiguity; they are not vivo device evidence. */
 class PhoneSettingsMatcherTest {
+    @Test fun automaticSwitchIsBoundToAnExactLabelAndNotOtherDisplaySwitches() {
+        val nodes = listOf(SettingsUiNode(text = "显示、亮度与护眼"),
+            SettingsUiNode(parent = 0, clickable = true, left = 0, top = 200, right = 320, bottom = 270),
+            SettingsUiNode(text = "自动调节屏幕亮度", parent = 1),
+            SettingsUiNode(parent = 1, checkable = true, left = 270, top = 210, right = 310, bottom = 250),
+            SettingsUiNode(text = "智能调节应用亮度", checkable = true, left = 0, top = 300, right = 320, bottom = 370))
+        assertEquals(3, PhoneSettingsMatcher.automaticBrightness(nodes)!!.index)
+        assertNull(PhoneSettingsMatcher.automaticBrightness(nodes.takeLast(1)))
+        assertNull(PhoneSettingsMatcher.automaticBrightness(nodes + nodes[3].copy(top = 400, bottom = 450)))
+    }
+    @Test fun hiddenOrDisabledAutomaticSwitchCannotBeOfferedAsATarget() {
+        val title = SettingsUiNode(text = "Display & touch")
+        val toggle = SettingsUiNode(text = "Adaptive brightness", checkable = true, left = 0, top = 200, right = 300, bottom = 260)
+        assertNull(PhoneSettingsMatcher.automaticBrightness(listOf(title, toggle.copy(visible = false)))!!.index)
+        assertNull(PhoneSettingsMatcher.automaticBrightness(listOf(title, toggle.copy(enabled = false)))!!.index)
+        assertNull(PhoneSettingsMatcher.automaticBrightness(listOf(SettingsUiNode(text = "Payments"))))
+    }
     private fun range(id: String = "", parent: Int = -1, y: Int = 120, visible: Boolean = true) =
         SettingsUiNode(id = id, parent = parent, visible = visible, adjustable = true,
             left = 20, top = y, right = 300, bottom = y + 40)

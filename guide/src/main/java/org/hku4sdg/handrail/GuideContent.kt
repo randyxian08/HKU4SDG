@@ -38,6 +38,9 @@ enum class GuideStep(val task: GuideTask, val number: Int) {
     COMPLETE(GuideTask.FONT_SIZE, 2),
     BRIGHTNESS_ROW(GuideTask.SCREEN_BRIGHTNESS, 1),
     BRIGHTNESS_SLIDER(GuideTask.SCREEN_BRIGHTNESS, 2),
+    BRIGHTNESS_AUTO(GuideTask.SCREEN_BRIGHTNESS, 1),
+    BRIGHTNESS_AUTO_SCROLL(GuideTask.SCREEN_BRIGHTNESS, 1),
+    BRIGHTNESS_AUTO_COMPLETE(GuideTask.SCREEN_BRIGHTNESS, 2),
     BRIGHTNESS_COMPLETE(GuideTask.SCREEN_BRIGHTNESS, 2),
     CHROME_MENU(GuideTask.CHROME_BOOKMARK, 1),
     CHROME_SAVE(GuideTask.CHROME_BOOKMARK, 2),
@@ -46,9 +49,9 @@ enum class GuideStep(val task: GuideTask, val number: Int) {
     MAPS_PLACE(GuideTask.MAPS_LIBRARY_ADDRESS, 1),
     MAPS_ADDRESS(GuideTask.MAPS_LIBRARY_ADDRESS, 2);
 
-    val isComplete get() = this == COMPLETE || this == BRIGHTNESS_COMPLETE ||
+    val isComplete get() = this == COMPLETE || this == BRIGHTNESS_COMPLETE || this == BRIGHTNESS_AUTO_COMPLETE ||
         this == CHROME_COMPLETE || this == MAPS_ADDRESS
-    val isScrollHint get() = this == DISPLAY_SCROLL || this == SLIDER_SCROLL
+    val isScrollHint get() = this == DISPLAY_SCROLL || this == SLIDER_SCROLL || this == BRIGHTNESS_AUTO_SCROLL
 }
 
 /** Fixed copy for the reviewed Android 15 / Pixel 7 emulator flow. Native-speaker review is pending. */
@@ -93,6 +96,9 @@ object GuideContent {
             GuideStep.BRIGHTNESS_ROW -> "请点圈住的“Brightness level”。"
             GuideStep.BRIGHTNESS_SLIDER -> "请亲手把圈住的亮度滑块向右拖动。"
             GuideStep.BRIGHTNESS_COMPLETE -> "已检测到屏幕亮度提高。请看看现在是否更容易看清。"
+            GuideStep.BRIGHTNESS_AUTO -> "请点圈住的自动亮度开关。"
+            GuideStep.BRIGHTNESS_AUTO_SCROLL -> "在提示卡外向上滑动，找到自动亮度开关。"
+            GuideStep.BRIGHTNESS_AUTO_COMPLETE -> "自动亮度已开启，手机会随环境调节。请确认是否符合你的需要。"
             GuideStep.CHROME_MENU -> "请点圈住的 Chrome 右上角菜单。"
             GuideStep.CHROME_SAVE -> "请点圈住的“Bookmark”星标，收藏这个公开网页。"
             GuideStep.CHROME_VERIFY -> "请再次打开圈住的菜单，检查书签是否已保存。"
@@ -109,6 +115,9 @@ object GuideContent {
             GuideStep.BRIGHTNESS_ROW -> "请㩒圈住嘅「Brightness level」。"
             GuideStep.BRIGHTNESS_SLIDER -> "请自己将圈住嘅光度滑桿向右拖。"
             GuideStep.BRIGHTNESS_COMPLETE -> "屏幕光度已经提高。睇下而家系咪清楚啲。"
+            GuideStep.BRIGHTNESS_AUTO -> "请㩒圈住嘅自动光度开关。"
+            GuideStep.BRIGHTNESS_AUTO_SCROLL -> "喺提示卡外向上扫，搵自动光度开关。"
+            GuideStep.BRIGHTNESS_AUTO_COMPLETE -> "自动光度开咗，手机会跟环境调光度。请确认系咪你想要嘅。"
             GuideStep.CHROME_MENU -> "请㩒圈住嘅 Chrome 右上角選單。"
             GuideStep.CHROME_SAVE -> "请㩒圈住嘅「Bookmark」星號，收藏呢個公開網頁。"
             GuideStep.CHROME_VERIFY -> "请再打开圈住嘅選單，检查書籤係咪已儲存。"
@@ -125,6 +134,9 @@ object GuideContent {
             GuideStep.BRIGHTNESS_ROW -> "Tap the circled “Brightness level” row."
             GuideStep.BRIGHTNESS_SLIDER -> "Drag the circled brightness slider to the right."
             GuideStep.BRIGHTNESS_COMPLETE -> "Screen brightness has increased. Check whether it is easier to see."
+            GuideStep.BRIGHTNESS_AUTO -> "Tap the circled adaptive brightness switch."
+            GuideStep.BRIGHTNESS_AUTO_SCROLL -> "Swipe up outside this card to find adaptive brightness."
+            GuideStep.BRIGHTNESS_AUTO_COMPLETE -> "Adaptive brightness is on. Your phone will adjust to the environment. Check that this is what you wanted."
             GuideStep.CHROME_MENU -> "Tap the circled Chrome menu in the top right."
             GuideStep.CHROME_SAVE -> "Tap the circled Bookmark star to save this public page."
             GuideStep.CHROME_VERIFY -> "Open the circled menu again to check that the bookmark was saved."
@@ -168,7 +180,7 @@ class GuidePreferences(private val context: Context) {
         val record = PracticeRecord(guideSessionId, activeTask, helpMode, outcome, now, duration)
         practice.edit().putString("records", PracticeLedger.encode(PracticeLedger.append(records(), record))).apply()
         sessionState = sessionState.finish(outcome)
-        receiptPending = outcome == PracticeOutcome.CONFIRMED
+        receiptPending = true
     }
     var active: Boolean
         get() = sessionState.active
@@ -198,6 +210,12 @@ class GuidePreferences(private val context: Context) {
     var initialBrightness: Int
         get() = prefs.getInt("initialBrightness", -1)
         set(value) { prefs.edit().putInt("initialBrightness", value).apply() }
+    var brightnessGoal: BrightnessGoal
+        get() = runCatching { BrightnessGoal.valueOf(prefs.getString("brightnessGoal", "MANUAL")!!) }.getOrDefault(BrightnessGoal.MANUAL)
+        set(value) { prefs.edit().putString("brightnessGoal", value.name).apply() }
+    var brightnessBaselineReady: Boolean
+        get() = prefs.getBoolean("brightnessBaselineReady", false)
+        set(value) { prefs.edit().putBoolean("brightnessBaselineReady", value).apply() }
     var activeTask: GuideTask
         get() = GuideTask.fromId(prefs.getString("activeTask", "") ?: "") ?: GuideTask.FONT_SIZE
         set(value) { prefs.edit().putString("activeTask", value.id).apply() }

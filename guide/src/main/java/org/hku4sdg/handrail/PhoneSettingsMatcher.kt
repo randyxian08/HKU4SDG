@@ -5,7 +5,8 @@ data class SettingsUiNode(
     val text: String = "", val description: String = "", val id: String = "",
     val parent: Int = -1, val visible: Boolean = true, val enabled: Boolean = true,
     val clickable: Boolean = false, val adjustable: Boolean = false,
-    val left: Int = 0, val top: Int = 0, val right: Int = 0, val bottom: Int = 0
+    val left: Int = 0, val top: Int = 0, val right: Int = 0, val bottom: Int = 0,
+    val checkable: Boolean = false
 )
 
 data class SettingsUiMatch(val step: GuideStep, val index: Int?, val label: String, val controlPage: Boolean)
@@ -18,6 +19,8 @@ object PhoneSettingsMatcher {
         "显示大小和文字", "显示大小与文字", "显示大小和文本", "display size and text").map(::norm)).toSet()
     private val brightnessNames = setOf("亮度", "屏幕亮度", "显示亮度", "亮度级别", "brightness", "brightness level", "display brightness").map(::norm).toSet()
     private val displayPages = setOf("显示、亮度与护眼", "显示与亮度", "显示和亮度", "显示与触摸", "显示和触摸", "显示和触控", "显示与触控", "显示", "display", "display & touch").map(::norm).toSet()
+    private val automaticNames = setOf("自动亮度", "自動亮度", "自动调节屏幕亮度", "自動調節螢幕亮度",
+        "自动调节亮度", "自動調節亮度", "adaptive brightness", "automatic brightness", "auto brightness").map(::norm).toSet()
 
     private fun kind(value: String): Kind {
         val key = norm(value.substringBefore(',').substringBefore('，').substringBefore(':').substringBefore('：'))
@@ -32,7 +35,7 @@ object PhoneSettingsMatcher {
     private fun labels(node: SettingsUiNode) = listOf(node.text, node.description).filter(String::isNotBlank)
     fun safeLabel(value: String): String {
         val base = value.substringBefore(',').substringBefore('，').substringBefore(':').substringBefore('：').trim()
-        return if (norm(base) in fontPages + brightnessNames + displayPages || kind(base) != Kind.OTHER) base else ""
+        return if (norm(base) in fontPages + brightnessNames + displayPages + automaticNames || kind(base) != Kind.OTHER) base else ""
     }
     private fun name(wanted: Kind, nodes: List<SettingsUiNode>): String = nodes.filter { it.visible }
         .flatMap(::labels).firstOrNull { kind(it) == wanted }?.let(::safeLabel)
@@ -126,5 +129,21 @@ object PhoneSettingsMatcher {
         if (row != null && staticTitle(displayPages + brightnessNames, nodes) != null)
             return SettingsUiMatch(GuideStep.BRIGHTNESS_ROW, row.first, row.second, false)
         return null
+    }
+    fun automaticBrightness(nodes: List<SettingsUiNode>): SettingsUiMatch? {
+        val labels = nodes.indices.filter { nodes[it].visible && PhoneSettingsMatcher.labels(nodes[it]).any { norm(it) in automaticNames } }
+        val switches = labels.flatMap { label ->
+            if (nodes[label].checkable) listOf(label) else {
+                val row = clickableAncestor(label, nodes) ?: nodes[label].parent
+                if (row !in nodes.indices) emptyList() else nodes.indices.filter {
+                    nodes[it].checkable && descendant(it, row, nodes)
+                }
+            }
+        }.filter { nodes[it].visible && nodes[it].enabled && nodes[it].right > nodes[it].left && nodes[it].bottom > nodes[it].top }
+            .distinctBy { listOf(nodes[it].left, nodes[it].top, nodes[it].right, nodes[it].bottom) }
+        if (switches.size > 1) return null
+        if (switches.size == 1) return SettingsUiMatch(GuideStep.BRIGHTNESS_AUTO, switches.single(), "自动亮度 / Adaptive brightness", true)
+        return if (staticTitle(displayPages, nodes) != null)
+            SettingsUiMatch(GuideStep.BRIGHTNESS_AUTO_SCROLL, null, "自动亮度 / Adaptive brightness", false) else null
     }
 }

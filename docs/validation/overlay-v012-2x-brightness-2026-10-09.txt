@@ -1,0 +1,23 @@
+
+Waiting up to 10 seconds for service rebind
+
+PASS
+click + role + >=48dp: 调亮屏幕
+click + role + >=48dp: 打开设置，开始
+card clear of Brightness level: Rect(32, 1745 - 1049, 2305)
+click + role + >=48dp: 更多
+click + role + >=48dp: 收起提示
+card clear of Brightness level: Rect(32, 1225 - 1049, 1459)
+click + role + >=48dp: 查看本步文字
+click + role + >=48dp: 更多
+click + role + >=48dp: 换个位置
+card clear of Brightness level: Rect(32, 1225 - 1049, 1806)
+click + role + >=48dp: 先停一下
+click + role + >=48dp: 继续指引
+click + role + >=48dp: 更多
+click + role + >=48dp: 结束，不确认
+click + role + >=48dp: 继续这次任务
+click + role + >=48dp: 结束，不确认
+click + role + >=48dp: 结束引导
+click + role + >=48dp: 留在这里
+Sentence + progressive options; collapse/move/pause preserve attempt; cancel exit preserves task

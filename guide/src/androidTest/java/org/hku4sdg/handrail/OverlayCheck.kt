@@ -53,7 +53,7 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
                 candidate.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY &&
                     nodes(candidate.root).any {
                         it.packageName?.toString() == targetContext.packageName &&
-                            (it.text?.toString()?.length ?: 0) > 4
+                            it.isClickable
                     }
             }
             if (window != null) return window
@@ -101,9 +101,11 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
             info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             ui.serviceInfo = info
             // Starting instrumentation kills the prior target process; the host rebinds the guide.
+            runner.sendStatus(0, Bundle().apply { putString("stream", "\nWaiting up to 10 seconds for service rebind\n") })
             repeat(100) { if (!GuideAccessibilityService.connected) SystemClock.sleep(100) }
             check(GuideAccessibilityService.connected) { "Rebind the guide service after starting this check" }
             prefs.setupTask = null
+            prefs.receiptPending = false
             runner.startActivitySync(Intent(targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
             click(if (task == GuideTask.FONT_SIZE) "把字调大" else "调亮屏幕")
             click("打开设置，开始")
@@ -125,6 +127,7 @@ class OverlayCheck(private val runner: Instrumentation, private val task: GuideT
             find("结束这次引导？", false); click("继续这次任务")
             check(prefs.active && prefs.guideSessionId == session)
             click("结束，不确认"); click("结束引导")
+            find("这次引导已结束", false); click("留在这里")
             check(!prefs.active && prefs.guideSessionId == session)
             log += "Sentence + progressive options; collapse/move/pause preserve attempt; cancel exit preserves task"
             result.putString("stream", "\nPASS\n" + log.joinToString("\n") + "\n"); code = Activity.RESULT_OK

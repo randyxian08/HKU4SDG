@@ -86,6 +86,7 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
         var code = Activity.RESULT_CANCELED
         try {
             check(!prefs.active) { "End the existing attempt before the phone regression" }
+            prefs.receiptPending = false
             check(context.resources.configuration.locales[0].language == "zh") { "Use real Chinese system pages for this regression" }
             automation = runner.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
             val info = automation.serviceInfo
@@ -116,7 +117,7 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
             await("confirmed history") { it.text?.toString() == "你已确认完成" }
             check(prefs.records().first().outcome == PracticeOutcome.CONFIRMED)
             events += "Chinese Settings font row + actual slider + system value increase + user confirmation"
-            openHome(); tapApp("调亮屏幕"); tapApp("打开设置，开始")
+            tapApp("留在这里"); openHome(); tapApp("调亮屏幕"); tapApp("打开设置，开始")
             if (all().none { it.packageName?.toString() == context.packageName && it.text?.toString()?.startsWith("请亲手把圈住的亮度") == true }) {
                 appText("请点圈住的")
                 tapNative(setOf("亮度级别", "亮度", "屏幕亮度"))
@@ -130,7 +131,7 @@ internal class PhoneSettingsCheck(private val runner: Instrumentation) {
             tapApp("确认完成")
             await("confirmed brightness history") { it.text?.toString() == "你已确认完成" }
             events += "Chinese Settings brightness row + actual slider + value increase + user confirmation"
-            openHome(); tapApp("把字调大"); tapApp("打开设置，开始")
+            tapApp("留在这里"); openHome(); tapApp("把字调大"); tapApp("打开设置，开始")
             context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             tapApp("复制适配信息")
             runner.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))

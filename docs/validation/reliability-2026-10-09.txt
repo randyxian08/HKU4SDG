@@ -1,0 +1,13 @@
+
+Waiting up to 10 seconds for service rebind
+
+PASS
+Versioned local diagnostics distinguish permission, connection and task state
+First-time restricted-settings help is reachable before or after enabling the service
+Real platform interrupt preserves running attempt; scrolling reuses the same overlay window
+Physical touch through the non-touchable highlight opens the actual Font size page
+Collapsed Replay and Text are reachable by physical touch; audio quality is not evaluated
+Font preview stays visible; actual font increase + user confirmation gives a persistent receipt
+Actual manual brightness + checked result + confirmation; unavailable adaptive choice is disabled and explained
+LIMIT: native adaptive-switch branches cannot run on this emulator (platform capability false); covered by synthetic matching/state tests only
+Unconfirmed exit remains distinct from completion and gives an explicit stay/return receipt

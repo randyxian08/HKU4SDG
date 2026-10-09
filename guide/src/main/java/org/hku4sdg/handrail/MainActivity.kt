@@ -27,7 +27,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
-    private enum class Screen { HOME, TASK, LANGUAGES, PRACTICE, SETUP, RECOVERY, FIRST, CONFIRM, ADJUST }
+    private enum class Screen { HOME, TASK, LANGUAGES, PRACTICE, SETUP, RECOVERY, FIRST, CONFIRM, ADJUST, SETUP_HELP, DIAGNOSTICS, RECEIPT }
     private var screen = Screen.HOME
     private lateinit var preferences: GuidePreferences
     private lateinit var input: EditText
@@ -84,6 +84,9 @@ class MainActivity : Activity() {
             Screen.FIRST -> showFirstRun()
             Screen.CONFIRM -> showConfirm()
             Screen.ADJUST -> showAdjust()
+            Screen.SETUP_HELP -> showSetupHelp()
+            Screen.DIAGNOSTICS -> showDiagnostics()
+            Screen.RECEIPT -> showReceipt()
             else -> {
                 showHome()
                 savedInstanceState?.getString("goal")?.let(input::setText)
@@ -112,7 +115,7 @@ class MainActivity : Activity() {
         }
         if (::preferences.isInitialized && preferences.receiptPending) {
             preferences.receiptPending = false
-            showPractice()
+            showReceipt()
         }
         if (::preferences.isInitialized && preferences.active) {
             preferences.pause(PauseReason.USER)
@@ -471,6 +474,38 @@ class MainActivity : Activity() {
                 background = Design.shape(Design.paleOrange, dp(18).toFloat())
             })
         }
+        if (selectedTask == GuideTask.SCREEN_BRIGHTNESS && block == null) {
+            space(body, 24)
+            body.addView(text(c("你希望怎样调节？", "你想点样调光度？", "How should brightness work?"), 22f, Design.ink, true).heading())
+            space(body, 12)
+            BrightnessGoal.entries.forEach { goal ->
+                val name = if (goal == BrightnessGoal.MANUAL) c("现在自己调亮一点", "而家自己调光啲", "Adjust it myself now")
+                    else c("随环境自动调节", "跟环境自动调节", "Adjust automatically")
+                body.addView(action(name, if (preferences.brightnessGoal == goal) Design.forest else Design.surface, Design.ink, 64) {
+                    preferences.brightnessGoal = goal; showTask()
+                }.apply {
+                    isEnabled = goal != BrightnessGoal.ADAPTIVE || TaskAvailability.adaptiveBrightnessAvailable(this@MainActivity) != false
+                    if (!isEnabled) alpha = 0.55f
+                    isSelected = preferences.brightnessGoal == goal
+                    contentDescription = name + if (isSelected) c("，已选择", "，拣咗", ", selected") else ""
+                    accessibilityDelegate = object : View.AccessibilityDelegate() {
+                        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                            super.onInitializeAccessibilityNodeInfo(host, info)
+                            info.className = android.widget.RadioButton::class.java.name
+                            info.isCheckable = true; info.isChecked = preferences.brightnessGoal == goal
+                        }
+                    }
+                })
+                space(body, 10)
+            }
+            if (TaskAvailability.adaptiveBrightnessAvailable(this) == false) {
+                body.addView(text(c("这台设备没有提供自动亮度功能，可选择手动调节。", "呢台设备冇自动光度功能，可以拣手动调节。", "This device does not provide adaptive brightness. You can adjust it manually."), 18f, Design.ink))
+                space(body, 12)
+            }
+            body.addView(text(if (preferences.brightnessGoal == BrightnessGoal.MANUAL)
+                c("如果自动亮度已开启，我们会先带你关闭，再调滑块。", "如果自动光度开咗，我哋会先带你关闭，再调滑桿。", "If adaptive brightness is on, we’ll guide you to turn it off first.")
+                else c("我们会带你检查自动亮度开关，不改动其他显示设置。", "我哋会带你检查自动光度开关，唔改其他显示设置。", "We’ll guide you to check the adaptive brightness switch."), 17f, Design.secondary))
+        }
         space(body, 24)
         body.addView(text(c("这次怎么帮你", "这次怎么帮你", "How much help this time?"), 22f, Design.ink, true).heading())
         space(body, 10)
@@ -493,7 +528,11 @@ class MainActivity : Activity() {
             setPadding(dp(16), dp(8), dp(16), dp(8))
             background = Design.shape(Design.surface, dp(20).toFloat(), Design.line)
         }
-        (if (phoneTrial) PhoneGuideCopy.steps(selectedTask, l) else AppCopy.steps(selectedTask, l)).forEachIndexed { index, copy ->
+        (if (selectedTask == GuideTask.SCREEN_BRIGHTNESS) listOf(
+            c("检查自动亮度开关", "检查自动光度开关", "Check adaptive brightness"),
+            if (preferences.brightnessGoal == BrightnessGoal.MANUAL) c("调整滑块，确认是否舒服", "调滑桿，确认舒唔舒服", "Adjust the slider and check comfort")
+            else c("开启自动调节，再确认", "开启自动调节，再确认", "Enable automatic adjustment and confirm"))
+            else if (phoneTrial) PhoneGuideCopy.steps(selectedTask, l) else AppCopy.steps(selectedTask, l)).forEachIndexed { index, copy ->
             val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(60); setPadding(0, dp(12), 0, dp(12)) }
             row.addView(text((index + 1).toString(), 14f, Design.forest, true, Gravity.CENTER).apply {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -565,6 +604,10 @@ class MainActivity : Activity() {
             c("语音输入只在你点按后录制。当前模拟器的录音会送到火山引擎识别，应用和本机代理不保存音频。播报可把固定提示交给云端。你始终可以只用文字。", "语音输入只喺你㩒掣后录音。而家模拟器嘅录音会交俾火山引擎识别，应用同本机代理唔储存音频。播报可将固定提示交俾云端。你一直可以只用文字。", "Recording starts only after you tap Speak. This emulator sends audio to Volcano Engine; the app and local proxy do not save it. Fixed guidance may go to cloud speech. Text is always available.")
         else c("语音输入只在你点按后录制，由设备语音识别服务处理；它可能联网，保留方式取决于该服务。播报使用本机语音服务，支持的语言取决于已安装的语音。当前手机不连接火山开发代理，文字和任务卡始终可用。", "语音输入只喺你㩒掣后录音，由设备语音识别服务处理；佢可能联网，保留方式视乎服务。播报用本机语音服务，支持嘅语言视乎已安装嘅语音。而家手机唔连接火山开发代理，文字同任务卡一直都用得。", "Recording starts only after you tap Speak. The device recognition service may use the internet; its retention rules apply. Speech output uses installed device voices. This phone does not connect to the Volcano development proxy. Text and task cards remain available.")
         body.addView(text(privacy, 15f, Design.secondary))
+        space(body, 24)
+        body.addView(action(c("服务状态与诊断", "服务状态同诊断", "Service status and diagnostics"), Design.surface, Design.ink, 54) { showDiagnostics() })
+        space(body, 10)
+        body.addView(text(ServiceDiagnostics.buildLabel(), 14f, Design.secondary))
     }
 
     private fun topBar(title: String, onBack: () -> Unit): LinearLayout = LinearLayout(this).apply {
@@ -596,6 +639,8 @@ class MainActivity : Activity() {
 
     private fun startGuide() {
         TaskAvailability.block(this, selectedTask)?.let { showTask(); return }
+        if (selectedTask == GuideTask.SCREEN_BRIGHTNESS && preferences.brightnessGoal == BrightnessGoal.ADAPTIVE &&
+            TaskAvailability.adaptiveBrightnessAvailable(this) == false) { showTask(); return }
         if (!serviceEnabled() || !GuideAccessibilityService.connected) {
             preferences.setupTask = selectedTask
             preferences.setupHelp = selectedHelp
@@ -604,23 +649,10 @@ class MainActivity : Activity() {
         }
         try {
             if (selectedTask == GuideTask.SCREEN_BRIGHTNESS) {
-                val mode = Settings.System.getInt(contentResolver,
-                    Settings.System.SCREEN_BRIGHTNESS_MODE, -1)
-                if (mode != Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL) {
-                    AlertDialog.Builder(this).setTitle(c("当前使用自动亮度", "而家用紧自动光度", "Adaptive brightness is on"))
-                        .setMessage(c("这项引导只验证了手动亮度。请先在系统设置关闭自动亮度，再开始。", "呢项指引只验证咗手动光度。请先喺系统设置关闭自动光度，再开始。", "This guide covers manual brightness. Turn off adaptive brightness in Settings, then try again."))
-                        .setPositiveButton(c("知道了", "知道喇", "Got it"), null).show()
-                    return
-                }
-                preferences.initialBrightness = Settings.System.getInt(contentResolver,
-                    Settings.System.SCREEN_BRIGHTNESS, -1)
-                if (preferences.initialBrightness < 0) error("Brightness unavailable")
-                if (!TaskAvailability.experimental(this, selectedTask) && preferences.initialBrightness >= 250) {
-                    AlertDialog.Builder(this).setTitle(c("屏幕亮度已接近最高", "光度已接近最高", "Brightness is near maximum"))
-                        .setMessage(c("现在无法再明显调高亮度。请先在系统设置中调低亮度，之后再开始这项引导。", "而家冇办法再明显调光。请先喺系统设置调低光度，再开始呢项指引。", "There is little room to increase brightness. Lower it in Settings first, then start this guide."))
-                        .setPositiveButton(c("知道了", "知道喇", "Got it"), null).show()
-                    return
-                }
+                val mode = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, -1)
+                preferences.initialBrightness = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, -1)
+                preferences.brightnessBaselineReady = mode == Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+                if (preferences.initialBrightness < 0 || mode !in 0..1) error("Brightness unavailable")
             } else if (selectedTask == GuideTask.FONT_SIZE) {
                 preferences.initialFontScale = Settings.System.getFloat(contentResolver, "font_scale", resources.configuration.fontScale)
                 if (!TaskAvailability.experimental(this, selectedTask) && preferences.initialFontScale >= 1.99f) {
@@ -714,9 +746,89 @@ class MainActivity : Activity() {
         })
         if (!enabled) {
             space(body, 10)
+            body.addView(action(c("无法开启？查看帮助", "开启唔到？睇下帮助", "Can’t enable it? Get help"), Design.surface, Design.ink, 54) { showSetupHelp() })
+            space(body, 10)
             body.addView(action(if (preferences.setupTask != null) SupportCopy.backToTask(l) else SupportCopy.backHome(l),
                 Design.background, Design.secondary, 52) { leaveSetup() })
+        } else {
+            space(body, 16)
+            body.addView(action(c("首次开启帮助", "首次开启帮助", "First-time setup help"), Design.surface, Design.ink, 54) { showSetupHelp() })
         }
+    }
+
+    private fun showSetupHelp() {
+        screen = Screen.SETUP_HELP
+        val body = page(c("开启遇到困难", "开启遇到困难", "Help enabling the guide"), ::showSetup)
+        body.addView(text(c("开关不可用或提示受限制？", "开关用唔到或者提示受限制？", "Is the switch restricted?"), 26f, Design.ink, true).heading())
+        space(body, 14)
+        body.addView(text(c("部分安装方式会触发 Android 的敏感权限保护。请先确认这个测试包来自你信任的团队，再决定是否授权。", "部分安装方式会触发 Android 敏感权限保护。请先确认测试包来自你信任嘅团队，再决定授权。", "Some installation methods trigger Android’s protection for sensitive permissions. Confirm that you trust the team supplying this build before allowing access."), 18f))
+        space(body, 22)
+        listOf(c("打开数字扶手的应用信息。", "打开数字扶手嘅应用资料。", "Open Digital Handrail’s app info."),
+            c("查看右上角更多菜单；如果有“允许受限制的设置”或“解除限制”，按系统提示自行决定。不同手机名称可能不同。", "睇右上角更多菜单；如果有「允许受限制的设置」或者「解除限制」，按系统提示自己决定。手机名称可能唔同。", "Check the top-right menu for Allow restricted settings. Names vary by phone; read the system prompt and decide yourself."),
+            c("返回无障碍页面，开启“数字扶手 · 手机引导”，然后回到这里检查。", "返无障碍页面，开启「数字扶手 · 手机引导」，再返嚟检查。", "Return to Accessibility, enable Digital Handrail, then come back to check.")).forEachIndexed { i, line ->
+            body.addView(text("${i + 1}. $line", 18f, Design.ink, true)); space(body, 16)
+        }
+        body.addView(action(c("打开应用信息", "打开应用资料", "Open app info"), Design.forest, Design.surface, 56) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
+        })
+        space(body, 12)
+        body.addView(action(c("返回检查服务", "返去检查服务", "Check the service again"), Design.surface, Design.ink, 56) { showSetup() })
+        space(body, 24)
+        body.addView(text(c("已经开启却总是关闭？", "开咗但成日关闭？", "Does it turn off after enabling?"), 22f, Design.ink, true).heading())
+        space(body, 10)
+        body.addView(text(c("这与首次解除限制不同。请查看服务诊断，记录权限和连接状态，避免反复修改不相关设置。", "呢个同首次解除限制唔同。请睇服务诊断，记录权限同连接状态。", "This differs from restricted setup. Check diagnostics to distinguish permission changes from a disconnected service."), 18f))
+        space(body, 12)
+        body.addView(action(c("服务状态与诊断", "服务状态同诊断", "Service status and diagnostics"), Design.surface, Design.ink, 54) { showDiagnostics() })
+    }
+
+    private fun showDiagnostics() {
+        screen = Screen.DIAGNOSTICS
+        val body = page(c("服务状态与诊断", "服务状态同诊断", "Service status and diagnostics"), ::showAdjust)
+        body.addView(text(c("把问题说清楚", "睇清楚问题", "Understand the service state"), 26f, Design.ink, true).heading())
+        space(body, 18)
+        val enabled = serviceEnabled()
+        body.addView(text(c("系统权限：", "系统权限：", "System permission: ") + if (enabled) c("已开启", "开咗", "On") else c("已关闭", "关咗", "Off"), 20f, Design.ink, true))
+        space(body, 12)
+        body.addView(text(c("服务连接：", "服务连接：", "Service connection: ") + if (GuideAccessibilityService.connected) c("已连接", "连接咗", "Connected") else c("未连接", "未连接", "Disconnected"), 20f, Design.ink, true))
+        space(body, 12)
+        body.addView(text(c("本次引导：", "今次指引：", "This guide: ") + when (preferences.sessionState.phase) {
+            SessionPhase.RUNNING -> c("正在进行", "进行紧", "Running")
+            SessionPhase.PAUSED -> c("已暂停", "暂停咗", "Paused")
+            SessionPhase.IDLE -> c("未进行", "未开始", "Inactive")
+        }, 20f, Design.ink, true))
+        space(body, 18)
+        body.addView(text(ServiceDiagnostics.buildLabel(), 16f, Design.secondary))
+        space(body, 18)
+        body.addView(text(c("诊断仅包含设备版本、服务时间线和进程退出原因，保存在本机。不含页面文字、目标、录音或账号；复制后由你决定是否分享。", "诊断只包括设备版本、服务时间线同进程退出原因，保存在本机。唔包括页面文字、目标、录音或账号；复制后由你决定分享。", "Diagnostics stay on this device and contain versions, service events and exit reasons. No screen text, goals, audio or accounts. You decide whether to share the copy."), 18f))
+        space(body, 18)
+        body.addView(action(c("复制诊断信息", "复制诊断资料", "Copy diagnostics"), Design.forest, Design.surface, 56) {
+            getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Handrail diagnostics", ServiceDiagnostics.report(this)))
+            Toast.makeText(this, c("已复制，可粘贴给协作者", "复制咗，可以贴俾协作者", "Copied. You can share it with your team."), Toast.LENGTH_SHORT).show()
+        })
+        space(body, 12)
+        body.addView(action(c("刷新状态", "更新状态", "Refresh status"), Design.surface, Design.ink, 54) { showDiagnostics() })
+        space(body, 12)
+        body.addView(action(SupportCopy.openSettings(preferences.textLanguage), Design.surface, Design.ink, 54) { showSetup() })
+    }
+
+    private fun showReceipt() {
+        screen = Screen.RECEIPT
+        val record = preferences.records().firstOrNull() ?: run { showHome(); return }
+        val confirmed = record.outcome == PracticeOutcome.CONFIRMED
+        val body = page(c("这次引导", "今次指引", "This guide"), ::showHome)
+        body.addView(icon(taskIcon(record.task), 40), LinearLayout.LayoutParams(dp(56), dp(56)))
+        space(body, 24)
+        body.addView(text(if (confirmed) c("你已确认完成", "你已确认完成", "You confirmed completion")
+            else c("这次引导已结束", "今次指引结束咗", "This guide has ended"), 28f, Design.ink, true).heading())
+        space(body, 14)
+        body.addView(text(SupportCopy.task(record.task, preferences.textLanguage), 22f, Design.ink, true))
+        space(body, 14)
+        body.addView(text(if (confirmed) c("结果已经由你确认。以后需要帮助，可以再叫我。", "结果由你确认咗。之后需要帮助，可以再叫我。", "You checked the result. You can ask for help again anytime.")
+            else c("尚未确认完成，记录也不会算成成功。你可以重新开始。", "未确认完成，记录唔会算成功。你可以重新开始。", "Completion was not confirmed and is not recorded as success. You can try again."), 18f))
+        space(body, 28)
+        body.addView(action(c("返回首页", "返首页", "Back to home"), Design.forest, Design.surface, 58) { showHome() })
+        space(body, 12)
+        body.addView(action(c("查看尝试记录", "睇尝试记录", "View attempts"), Design.surface, Design.ink, 56) { showPractice() })
     }
 
     private fun showRecovery() {
@@ -755,13 +867,15 @@ class MainActivity : Activity() {
             selectedTask = preferences.activeTask
             selectedHelp = preferences.helpMode
             preferences.finish(PracticeOutcome.ENDED)
+            preferences.receiptPending = false
             taskSuggestedByAi = false
             showTask()
         })
         space(body, 10)
         body.addView(action(ExperienceCopy.unconfirmed(l), Design.background, Design.secondary, 52) {
             preferences.finish(PracticeOutcome.ENDED)
-            showHome()
+            preferences.receiptPending = false
+            showReceipt()
         })
     }
 
@@ -832,7 +946,7 @@ class MainActivity : Activity() {
         GuideTask.MAPS_LIBRARY_ADDRESS -> c("看香港中央图书馆的地址", "看香港中央图书馆的地址", "See the Hong Kong Central Library address")
     }
 
-    private fun runner() = FirstRun(this, preferences, ::serviceEnabled, ::openServiceSettings, { showHome() }, { showHome() })
+    private fun runner() = FirstRun(this, preferences, ::serviceEnabled, ::openServiceSettings, { showHome() }, { showHome() }, ::showSetup, ::showDiagnostics)
 
     private fun showFirstRun() {
         screen = Screen.FIRST
@@ -868,6 +982,9 @@ class MainActivity : Activity() {
         when (screen) {
             Screen.HOME -> super.onBackPressed()
             Screen.SETUP -> leaveSetup()
+            Screen.SETUP_HELP -> showSetup()
+            Screen.DIAGNOSTICS -> showAdjust()
+            Screen.RECEIPT -> showHome()
             Screen.FIRST -> if (preferences.initStep > 0) { preferences.initStep -= 1; showFirstRun() } else super.onBackPressed()
             Screen.CONFIRM, Screen.ADJUST -> showHome()
             else -> showHome()

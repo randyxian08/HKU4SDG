@@ -1,6 +1,6 @@
 # 数字扶手｜开发接手指南
 
-更新于 2026-10-09。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。0.1.1 手机实验路径见[手机测试指南](phone-testing.md)。
+更新于 2026-10-09。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。0.1.1 手机实验路径见[手机测试指南](phone-testing.md)；当前 0.1.2 的行为和验收见[引导优化记录](guide-reliability-2026-10-09.md)。
 
 ## 1. 获取当前实现
 
@@ -55,9 +55,9 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 2. 阅读权限用途，进入系统无障碍设置，亲手开启“数字扶手 · 手机引导”。
 3. 返回原任务，确认开始；权限开启不会替用户自动操作。
 4. 在目标应用中点击／拖动圈出的控件。暂停、未知页或离开任务后，恢复时重新核对页面。
-5. 结果出现后检查并确认；未确认退出不记为完成。
+5. 结果出现后检查并确认；未确认退出不记为完成。回执提供返回数字扶手和留在当前页面。
 
-字体任务须从未达上限的字号开始。亮度任务须关闭自动亮度且起始值低于上限。第三方应用必须符合目录中的完整版本；加载时可能先显示页面未识别，已审核页面准备好后会重新检查。
+字体任务须从未达上限的字号开始。亮度先选择手动或自动。手动路径若遇自动亮度，会先引导用户关闭，再记录基线、调滑块；起始值应低于上限。自动分支只接受唯一可核对的开关。本次模拟器没有自动亮度功能，禁用该选择；合成测试不能代替自动开关的设备验收。第三方应用必须符合目录中的完整版本；加载时可能先显示页面未识别，已审核页面准备好后会重新检查。
 
 四项演示的场景和失败退路见[可演示案例](demo-cases.md)。
 
@@ -72,6 +72,7 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 | [PhoneSettingsMatcher.kt](../guide/src/main/java/org/hku4sdg/handrail/PhoneSettingsMatcher.kt)、[PhoneGuideCopy.kt](../guide/src/main/java/org/hku4sdg/handrail/PhoneGuideCopy.kt) | 手机字体／亮度的唯一控件识别、实验说明、未知页退路和适配信息标签白名单 |
 | [GuideOverlay.kt](../guide/src/main/java/org/hku4sdg/handrail/GuideOverlay.kt)、[OverlayPlacement.kt](../guide/src/main/java/org/hku4sdg/handrail/OverlayPlacement.kt) | 不接收触控的圈画、可操作卡片、收起与固定操作、目标避让 |
 | [GuideContent.kt](../guide/src/main/java/org/hku4sdg/handrail/GuideContent.kt)、[SessionState.kt](../guide/src/main/java/org/hku4sdg/handrail/SessionState.kt)、[Practice.kt](../guide/src/main/java/org/hku4sdg/handrail/Practice.kt) | 固定三语步骤、偏好、活动／暂停状态与本机记录 |
+| [ServiceDiagnostics.kt](../guide/src/main/java/org/hku4sdg/handrail/ServiceDiagnostics.kt)、[BrightnessFlow.kt](../guide/src/main/java/org/hku4sdg/handrail/BrightnessFlow.kt) | 有界本机生命周期诊断、权限状态、构建标识；亮度目标分支 |
 | [Design.kt](../guide/src/main/java/org/hku4sdg/handrail/Design.kt)、`*Copy.kt` | 视觉样式及页面／恢复／帮助文案 |
 | [IntentClient.kt](../guide/src/main/java/org/hku4sdg/handrail/IntentClient.kt)、[CloudAsr.kt](../guide/src/main/java/org/hku4sdg/handrail/CloudAsr.kt)、[CloudTts.kt](../guide/src/main/java/org/hku4sdg/handrail/CloudTts.kt) | Debug 模拟器到宿主机的意图、识别和合成请求 |
 | [voice_proxy.py](../scripts/voice_proxy.py)、[asr_client.py](../scripts/asr_client.py) | 宿主机调用方舟／火山接口、返回校验及演示请求上限 |
@@ -153,35 +154,17 @@ CI 配置见 [android.yml](../.github/workflows/android.yml)。代理单元测�
 
 ```bash
 adb install -r guide/build/outputs/apk/androidTest/debug/guide-debug-androidTest.apk
-adb shell am instrument -w -e check overlay org.hku4sdg.handrail.test/org.hku4sdg.handrail.AccessibilityCheck
-# 亮度任务使用 -e check overlay -e task brightness
-# 英文系统、起始字号 1.0 下的首页／首次设置／完成条件检查：
-adb shell am instrument -w -e check integration org.hku4sdg.handrail.test/org.hku4sdg.handrail.AccessibilityCheck
+python3 scripts/run-device-check.py reliability
+python3 scripts/run-device-check.py integration
+python3 scripts/run-device-check.py overlay
+python3 scripts/run-device-check.py overlay --task brightness
+# 真实中文系统页面：
+python3 scripts/run-device-check.py phone
+# 先在系统设置启用 TalkBack，再检查平台角色与焦点：
+python3 scripts/run-device-check.py a11y
 ```
 
-启动 Instrumentation 会结束先前目标进程；浮窗检查最多等待 10 秒重新绑定服务。预先准备另一终端；启动检查后，只重新绑定数字扶手，保留其他已启用服务。以下示例在数字扶手原本已启用时使用：
-
-```bash
-python3 - <<'PY_REBIND'
-import subprocess, time
-
-def adb(*args):
-    return subprocess.check_output(['adb', 'shell', *args], text=True).strip()
-
-guide = 'org.hku4sdg.handrail/.GuideAccessibilityService'
-full = 'org.hku4sdg.handrail/org.hku4sdg.handrail.GuideAccessibilityService'
-services = adb('settings', 'get', 'secure', 'enabled_accessibility_services').split(':')
-assert guide in services or full in services, '先在系统设置启用数字扶手'
-others = [s for s in services if s not in (guide, full, '', 'null')]
-if others:
-    adb('settings', 'put', 'secure', 'enabled_accessibility_services', ':'.join(others))
-else:
-    adb('settings', 'delete', 'secure', 'enabled_accessibility_services')
-time.sleep(0.3)
-adb('settings', 'put', 'secure', 'enabled_accessibility_services', ':'.join(others + [guide]))
-adb('settings', 'put', 'secure', 'accessibility_enabled', '1')
-PY_REBIND
-```
+脚本仅允许模拟器，要求数字扶手原本已启用。Instrumentation 启动会结束旧目标进程；收到等待状态及正常结束后，脚本只重绑数字扶手，保留其他已启用服务。用户中途关闭权限时不重新开启；检查被打断时须先核对设备上的运行状态，再清理或重试。它核对结果正文 `PASS`、无 `FAIL` 及进程退出状态，不能只以 `adb` 退出码判断通过。应用本身不使用此操作恢复权限。`integration`、`overlay`、`reliability` 使用英文系统；`phone` 使用真实中文系统页面。多个目标用 `--serial` 指定。
 
 1.0 字号运行字体任务；2.0 字号须使用亮度任务，字体任务在该比例已达准入上限。用 `adb shell settings put system font_scale 1.0` 或 `2.0` 设置，结束后恢复演示字号。检查会恢复原偏好与练习记录；改变系统值的检查恢复起始数值。结束测试进程后，服务可能需要再次绑定；这不是正常使用中的应用崩溃。原生接口检查不等于完整 TalkBack 手势／朗读顺序或目标用户试用。
 
@@ -199,6 +182,8 @@ python3 scripts/evaluate_intent.py
 |---|---|---|
 | 找不到 `adb` 或 Java 版本不符 | SDK 路径、JDK 17、是否 source `dev-env.sh` | 修正本机环境后再构建 |
 | 首页显示任务不可用 | 系统／语言、应用是否启用、完整版本 | 使用已审核环境；不要为演示放宽目录判断 |
+| 无障碍首次开关不可用 | 开启页的“无法开启？查看帮助”、安装来源及系统实际提示 | 由用户进入应用信息，按系统菜单决定是否解除限制，再返回开启 |
+| 服务似乎自行关闭 | 设置 → 服务状态与诊断的权限、连接与任务三项状态及构建版本 | 主动复制本机诊断，区分权限关闭、解绑、进程退出和任务暂停；根因未证实前不自动归因 |
 | 浮窗没有出现 | 服务是否绑定、是否暂停、当前页面是否可核对 | 回到任务，明确继续；重新识别当前页面 |
 | 云端接口不可用 | `/health`、配置／依赖、代理终端及实际网络 | 使用文字或任务卡；TTS 不可用时保留设备播报退路 |
 | “页面未识别” | 是否仍在加载，是否进入指定网页／地点 | 已审核页准备好后重新核对；无法确认时撤圈 |
