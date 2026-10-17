@@ -1,0 +1,9 @@
+
+Waiting for service rebind
+
+PASS
+Cloud speech unavailable callback; temporary audio removed
+Proxy stopped: local match is labelled; unmatched goal keeps task cards; no automatic task start
+LIMIT: no microphone-input, native-speaker listening or phone/cloud-deployment acceptance
+
+Test cleanup: guide rebound

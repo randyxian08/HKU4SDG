@@ -4,6 +4,7 @@
 import base64
 import binascii
 import importlib.util
+import http.client
 import json
 import os
 import re
@@ -127,25 +128,36 @@ def synthesize(text: str, language: str, api_key: str) -> bytes:
     }, method="POST")
     chunks = []
     total = 0
-    completed = False
     with urllib.request.urlopen(request, timeout=20) as response:
         for line in response:
             if not line.strip():
                 continue
-            event = json.loads(line)
+            try:
+                event = json.loads(line)
+            except (ValueError, UnicodeError) as exc:
+                raise RuntimeError("Invalid TTS provider response") from exc
+            if not isinstance(event, dict):
+                raise RuntimeError("Invalid TTS provider event")
             if event.get("code") == 20000000:
-                completed = True
                 break
             if event.get("code") != 0:
                 raise RuntimeError("Volcano TTS returned a nonzero code")
             encoded = event.get("data")
             if encoded:
-                chunk = base64.b64decode(encoded, validate=True)
+                if not isinstance(encoded, str):
+                    raise RuntimeError("Invalid TTS audio encoding")
+                try:
+                    chunk = base64.b64decode(encoded, validate=True)
+                except (ValueError, binascii.Error) as exc:
+                    raise RuntimeError("Invalid TTS audio encoding") from exc
                 total += len(chunk)
                 if total > MAX_AUDIO_BYTES:
                     raise RuntimeError("Voice response exceeded the demo limit")
                 chunks.append(chunk)
-    if not completed or not chunks:
+    # Current HTTP API documents code=0 audio events and a clean HTTP EOF.
+    # Older streams also send 20000000. A broken HTTP stream still raises;
+    # do not require the optional marker or return an empty response as speech.
+    if not chunks:
         raise RuntimeError("Volcano TTS did not complete with audio")
     return b"".join(chunks)
 
@@ -165,6 +177,10 @@ class VoiceHandler(BaseHTTPRequestHandler):
             "ready": bool(os.environ.get("VOLCENGINE_API_KEY")),
             "intent_ready": bool(os.environ.get("ARK_API_KEY")),
             "asr_ready": bool(os.environ.get("VOLCENGINE_API_KEY")) and importlib.util.find_spec("aiohttp") is not None,
+            "intent_model": ARK_MODEL,
+            "used_intent_requests": self.used_intent_requests,
+            "used_asr_requests": self.used_asr_requests,
+            "used_tts_requests": self.used_requests,
             "remaining_demo_characters": MAX_DEMO_CHARACTERS - self.used_characters,
         })
 
@@ -199,7 +215,7 @@ class VoiceHandler(BaseHTTPRequestHandler):
         except (ValueError, KeyError, TypeError, json.JSONDecodeError):
             self.respond_json(400, {"error": "Invalid TTS request or missing API configuration"})
             return
-        except (urllib.error.URLError, RuntimeError, TimeoutError, binascii.Error):
+        except (urllib.error.URLError, RuntimeError, TimeoutError, binascii.Error, http.client.HTTPException):
             self.respond_json(502, {"error": "Voice provider unavailable"})
             return
         self.send_response(200)

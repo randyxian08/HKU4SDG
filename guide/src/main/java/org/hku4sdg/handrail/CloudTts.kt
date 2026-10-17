@@ -21,7 +21,7 @@ class CloudTts(private val context: Context) {
     private var player: MediaPlayer? = null
     private var audioFile: File? = null
 
-    fun speak(text: String, language: GuideLanguage, onUnavailable: () -> Unit) {
+    fun speak(text: String, language: GuideLanguage, onStarted: () -> Unit = {}, onUnavailable: () -> Unit) {
         stop()
         if (!enabled) {
             onUnavailable()
@@ -36,7 +36,7 @@ class CloudTts(private val context: Context) {
                     onUnavailable()
                     return@post
                 }
-                play(bytes, request, onUnavailable)
+                play(bytes, request, onStarted, onUnavailable)
             }
         }
     }
@@ -70,7 +70,16 @@ class CloudTts(private val context: Context) {
                 .toString().toByteArray(Charsets.UTF_8)
             connection.outputStream.use { it.write(body) }
             if (connection.responseCode != HttpURLConnection.HTTP_OK) error("TTS unavailable")
-            val result = connection.inputStream.use { it.readBytes() }
+            val result = connection.inputStream.use { stream ->
+                val output = java.io.ByteArrayOutputStream()
+                val chunk = ByteArray(4096)
+                while (output.size() <= 2_000_000) {
+                    val count = stream.read(chunk, 0, minOf(chunk.size, 2_000_001 - output.size()))
+                    if (count < 0) break
+                    output.write(chunk, 0, count)
+                }
+                output.toByteArray()
+            }
             if (result.isEmpty() || result.size > 2_000_000) error("Invalid audio size")
             return result
         } finally {
@@ -78,14 +87,19 @@ class CloudTts(private val context: Context) {
         }
     }
 
-    private fun play(bytes: ByteArray, request: Int, onUnavailable: () -> Unit) {
+    private fun play(bytes: ByteArray, request: Int, onStarted: () -> Unit, onUnavailable: () -> Unit) {
         try {
             val file = File.createTempFile("handrail-tts-", ".mp3", context.cacheDir)
             file.writeBytes(bytes)
             audioFile = file
             player = MediaPlayer().apply {
                 setDataSource(file.absolutePath)
-                setOnPreparedListener { if (request == generation) it.start() }
+                setOnPreparedListener {
+                    if (request == generation) {
+                        try { it.start(); onStarted() }
+                        catch (_: IllegalStateException) { this@CloudTts.stop(); onUnavailable() }
+                    }
+                }
                 setOnCompletionListener { if (request == generation) this@CloudTts.stop() }
                 setOnErrorListener { _, _, _ ->
                     if (request == generation) {
