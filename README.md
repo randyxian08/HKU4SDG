@@ -8,6 +8,8 @@
 
 > 0.1.3 修正当前火山 TTS 响应兼容问题，增加 AI／语音演示启动与真实调用检查，明确 AI 和本机匹配的来源。接入方式、比赛要求及验证边界见[AI 与三语语音](docs/ai-voice-demo-2026-10-17.md)。
 
+> 准备报告或路演时，先读[GenAI 路演说明](docs/pitch-genai.md)：可直接使用的产品叙事、六项技术评分说明、已验证证据与待补材料，内容与飞书同步。
+
 > 0.1.2 新增浮窗预览避让、直接重播、明确结束回执、亮度目标选择及本机服务诊断。证据和仍未证实的问题见[引导优化记录](docs/guide-reliability-2026-10-09.md)。
 
 > 四项演示基线见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。0.1.1 新增字体与亮度的手机实验引导；安装方法、中文页面截图和适用边界见[手机测试指南](docs/phone-testing.md)。
@@ -92,6 +94,7 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 - [开发接手指南](docs/development.md)：环境、模块、云端代理、测试和故障排查。
 - [手机测试指南](docs/phone-testing.md)：0.1.1 安装、字体／亮度实验引导及 vivo 测试注意点。
 - [可演示案例](docs/demo-cases.md)：四项场景、失败退路和演示口径。
+- [GenAI 路演说明](docs/pitch-genai.md)：模型的用途、选择依据、对照、限制、成本和演示顺序。
 - [0.1.2 浮窗与引导优化](docs/guide-reliability-2026-10-09.md)：预览避让、稳定窗口、亮度分支、权限帮助与诊断。
 - [首页与浮窗整合记录](docs/ui-integration-2026-10-09.md)：当前 UI、首次设置、完成条件及真实截图。
 - [先前浮窗与第三方案例](docs/overlay-usability.md)：Chrome／Maps 操作和历史验证。

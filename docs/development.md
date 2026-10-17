@@ -1,6 +1,6 @@
 # 数字扶手｜开发接手指南
 
-更新于 2026-10-09。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。0.1.1 手机实验路径见[手机测试指南](phone-testing.md)；当前 0.1.2 的行为和验收见[引导优化记录](guide-reliability-2026-10-09.md)。
+更新于 2026-10-17。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。当前 0.1.3 的 AI／语音接入与验收见[演示指南](ai-voice-demo-2026-10-17.md)；0.1.2 的引导改进见[优化记录](guide-reliability-2026-10-09.md)，手机实验路径见[手机测试指南](phone-testing.md)。
 
 ## 1. 获取当前实现
 
@@ -97,20 +97,13 @@ python3 -m venv .venv
 
 `.env` 的两个字段各有用途：`VOLCENGINE_API_KEY` 用于已开通的 TTS/ASR，`ARK_API_KEY` 是仅允许方舟 Mini 模型的独立密钥。保持 `.env` 被 Git 忽略。
 
-在独立终端加载本机配置并运行：
+在独立终端启动代理并保持运行：
 
 ```bash
-set -a
-source .env
-set +a
-.venv/bin/python scripts/voice_proxy.py
+.venv/bin/python scripts/start-ai-demo.py
 ```
 
-本机 Homebrew Python 若出现证书验证错误，使用已验证的系统证书库启动：
-
-```bash
-SSL_CERT_FILE=/etc/ssl/cert.pem .venv/bin/python scripts/voice_proxy.py
-```
+启动脚本只读取两个凭据字段，不执行 `.env` 内容；macOS 上未设置 `SSL_CERT_FILE` 时会选用存在的 `/etc/ssl/cert.pem`。端口占用时退出，不停止已有进程。按 Ctrl-C 停止代理。
 
 在另一终端检查：
 
@@ -147,6 +140,14 @@ python3 -m unittest discover -s scripts -p 'test_voice_proxy.py'
 ```
 
 CI 配置见 [android.yml](../.github/workflows/android.yml)。代理单元测试使用模拟接口响应，不代表真实语音服务通过。Kotlin 报告位于 `guide/build/reports/tests/testDebugUnitTest/`，lint 报告位于 `guide/build/reports/lint-results-debug.html`。
+
+本地覆盖代理与新启动脚本的完整 Python 检查：
+
+```bash
+python3 -m unittest discover -s scripts -p 'test_*.py'
+```
+
+当前共 13 项；上方 CI 命令只运行 `test_voice_proxy.py`，不包含启动配置的两项检查。
 
 仅改动 Markdown 文件或 `docs/` 下的文档、截图和验证记录时，push 与 pull request 不触发 Android 构建。源码、Gradle、代理脚本及工作流改动仍触发构建；同一工作流和引用上的新运行会取消旧运行。需要检查纯文档修订时，可在 GitHub Actions 中手动运行 `Android build`。
 
