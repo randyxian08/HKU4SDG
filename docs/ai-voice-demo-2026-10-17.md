@@ -1,6 +1,6 @@
 # AI 与三语语音：比赛演示与验收
 
-核对日期：2026-10-17。Android 测试版：0.1.3 / versionCode 4。基准：`main` 的 `1b77ef7`。
+核对日期：2026-10-17。Android 测试版：0.1.3 / versionCode 4。测试构建基于 `1b77ef7`；本轮实现已由 [PR #15](https://github.com/randyxian08/HKU4SDG/pull/15) 合并至 `main`（`90040a7`）。供评委与队友阅读的六项说明见 [GenAI 路演说明](pitch-genai.md)。
 
 ## 先回答：有没有接入模型
 
