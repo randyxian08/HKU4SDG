@@ -81,9 +81,15 @@ object GuideContent {
     }
 
     fun intentMatched(language: GuideLanguage) = when (language) {
-        GuideLanguage.MANDARIN -> "根据你的描述，找到这项已审核任务。请确认后再开始。"
-        GuideLanguage.CANTONESE -> "根据你嘅描述，搵到呢项已审核任务。请确认之后先开始。"
-        GuideLanguage.ENGLISH -> "We found this reviewed task. Please confirm before starting."
+        GuideLanguage.MANDARIN -> "AI 根据你的描述找到这项引导。请确认后再开始。"
+        GuideLanguage.CANTONESE -> "AI 根据你嘅描述搵到呢项指引。请确认之后先开始。"
+        GuideLanguage.ENGLISH -> "AI found this guide from your description. Please confirm before starting."
+    }
+
+    fun intentLocalFallback(language: GuideLanguage) = when (language) {
+        GuideLanguage.MANDARIN -> "AI 暂时连不上，已通过本机匹配找到这项引导。请确认是否符合你的需求。"
+        GuideLanguage.CANTONESE -> "暂时连唔到 AI，已经用本机匹配搵到呢项指引。请确认系咪你想做嘅事。"
+        GuideLanguage.ENGLISH -> "AI is unavailable. This guide was matched on your device. Please check that it is what you want."
     }
 
     fun instruction(step: GuideStep, language: GuideLanguage): String = when (language) {

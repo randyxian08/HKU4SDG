@@ -83,6 +83,8 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 
 ## 5. 可选：云端 AI 与三语语音
 
+0.1.3 的推荐启动、真实回归和比赛演示口径见 [AI 与三语语音](ai-voice-demo-2026-10-17.md)。已有本机 `.env` 和 Python 依赖时，可直接运行 `.venv/bin/python scripts/start-ai-demo.py`；它读取配置而不执行 shell 内容。`.venv/bin/python scripts/check-ai-demo.py` 只检查配置，增加 `--live` 才调用真实供应商并可能产生用量。三语合成回归还需 `ffmpeg`。
+
 不配置云端服务也能使用任务卡和跨应用引导。云端桥接只对 Debug 模拟器启用：App 请求 `10.0.2.2:8765`，宿主机代理仅监听 `127.0.0.1:8765`。
 
 没有 `.env` 时先复制模板；已有 `.env` 时跳过复制并直接编辑，避免覆盖。用本机编辑器填写开发密钥，不要放入命令行、APK、文档或 Git：

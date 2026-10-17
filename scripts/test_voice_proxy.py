@@ -1,5 +1,6 @@
 import base64
 import io
+import http.client
 import json
 import os
 import threading
@@ -31,12 +32,30 @@ class VoiceProxyTest(unittest.TestCase):
         self.assertEqual(json.loads(sent["req_params"]["additions"])["explicit_dialect"], "yue")
         self.assertEqual(captured["request"].get_header("X-api-key"), "test-key")
 
-    def test_incomplete_audio_stream_is_rejected(self):
+    def test_documented_audio_stream_accepts_clean_eof_without_legacy_marker(self):
         def fake_open(request, timeout):
             return io.BytesIO(json.dumps({"code": 0, "data": base64.b64encode(b"partial").decode()}).encode())
 
         with patch.object(voice_proxy.urllib.request, "urlopen", side_effect=fake_open):
+            self.assertEqual(voice_proxy.synthesize("hello", "english", "test-key"), b"partial")
+
+    def test_empty_stream_and_broken_http_stream_are_rejected(self):
+        with patch.object(voice_proxy.urllib.request, "urlopen", return_value=io.BytesIO(b"")):
             with self.assertRaisesRegex(RuntimeError, "did not complete"):
+                voice_proxy.synthesize("hello", "english", "test-key")
+
+    def test_malformed_provider_data_is_not_an_invalid_user_request(self):
+        for event in (b"{broken", b"[]", b'{"code":0,"data":"bad base64"}'):
+            with self.subTest(event=event), patch.object(voice_proxy.urllib.request, "urlopen", return_value=io.BytesIO(event)):
+                with self.assertRaises(RuntimeError):
+                    voice_proxy.synthesize("hello", "english", "test-key")
+
+        class Broken(io.BytesIO):
+            def __next__(self):
+                raise http.client.IncompleteRead(b"partial", 20)
+
+        with patch.object(voice_proxy.urllib.request, "urlopen", return_value=Broken()):
+            with self.assertRaises(http.client.IncompleteRead):
                 voice_proxy.synthesize("hello", "english", "test-key")
 
     def test_missing_key_and_invalid_language_do_not_call_provider(self):

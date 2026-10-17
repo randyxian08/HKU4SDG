@@ -1,0 +1,9 @@
+
+Waiting for service rebind
+
+PASS
+English onboarding; independent input/text/voice; goal input precedes tasks
+Typed goal leads to confirmation; light help starts collapsed; exit stays unconfirmed
+On-demand help, pause/resume, collapse; 13 seconds idle cannot complete; real font increase plus explicit confirmation
+
+Test cleanup: guide rebound

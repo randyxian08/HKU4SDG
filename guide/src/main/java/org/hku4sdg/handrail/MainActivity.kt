@@ -39,7 +39,8 @@ class MainActivity : Activity() {
     private lateinit var intentClient: IntentClient
     private lateinit var cloudAsr: CloudAsr
     private var selectedTask = GuideTask.FONT_SIZE
-    private var taskSuggestedByAi = false
+    private enum class GoalSource { SHORTCUT, MODEL, LOCAL }
+    private var goalSource = GoalSource.SHORTCUT
     private var selectedHelp = HelpMode.FULL
     private var recognizer: SpeechRecognizer? = null
     private var inputGeneration = 0
@@ -52,7 +53,9 @@ class MainActivity : Activity() {
         cloudAsr = CloudAsr(this)
         selectedTask = savedInstanceState?.getString("selectedTask")?.let(GuideTask::fromId)
             ?: GuideTask.FONT_SIZE
-        taskSuggestedByAi = savedInstanceState?.getBoolean("taskSuggestedByAi") ?: false
+        goalSource = savedInstanceState?.getString("goalSource")?.let {
+            runCatching { GoalSource.valueOf(it) }.getOrNull()
+        } ?: GoalSource.SHORTCUT
         selectedHelp = savedInstanceState?.getString("help")?.let {
             runCatching { HelpMode.valueOf(it) }.getOrNull()
         } ?: preferences.helpMode
@@ -65,7 +68,7 @@ class MainActivity : Activity() {
         if (intent.getBooleanExtra("return_to_task", false)) {
             intent.removeExtra("return_to_task")
             selectedTask = preferences.activeTask
-            taskSuggestedByAi = false
+            goalSource = GoalSource.SHORTCUT
             showTask()
             return
         }
@@ -96,7 +99,7 @@ class MainActivity : Activity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("screen", screen.name)
-        outState.putBoolean("taskSuggestedByAi", taskSuggestedByAi)
+        outState.putString("goalSource", goalSource.name)
         outState.putString("selectedTask", selectedTask.id)
         outState.putString("help", selectedHelp.name)
         if (::input.isInitialized) outState.putString("goal", input.text.toString())
@@ -139,7 +142,7 @@ class MainActivity : Activity() {
         if (intent.getBooleanExtra("return_to_task", false)) {
             intent.removeExtra("return_to_task")
             selectedTask = preferences.activeTask
-            taskSuggestedByAi = false
+            goalSource = GoalSource.SHORTCUT
             showTask()
         }
     }
@@ -218,7 +221,7 @@ class MainActivity : Activity() {
                 background = Design.ripple(Design.surface, dp(16).toFloat(), Design.line, dp(1))
                 markAsButton()
                 contentDescription = "$title. $subtitle"
-                setOnClickListener { selectedTask = task; taskSuggestedByAi = false; showTask() }
+                setOnClickListener { selectedTask = task; goalSource = GoalSource.SHORTCUT; showTask() }
             }
             card.addView(text(title, 20f, Design.ink, true).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
             space(card, 8)
@@ -348,7 +351,7 @@ class MainActivity : Activity() {
             when (result?.decision) {
                 IntentClient.Decision.MATCH -> {
                     selectedTask = GuideTask.fromId(result.taskId) ?: return@classify
-                    taskSuggestedByAi = true
+                    goalSource = GoalSource.MODEL
                     showConfirm()
                 }
                 IntentClient.Decision.CLARIFY -> setInputStatus(GuideContent.intentClarify(preferences.textLanguage))
@@ -357,7 +360,7 @@ class MainActivity : Activity() {
                     val fallback = TaskMatcher.match(goal)
                     if (fallback != null) {
                         selectedTask = fallback
-                        taskSuggestedByAi = false
+                        goalSource = GoalSource.LOCAL
                         showConfirm()
                     } else setInputStatus(GuideContent.intentUnavailable(preferences.textLanguage))
                 }
@@ -453,10 +456,7 @@ class MainActivity : Activity() {
         body.addView(text("${AppCopy.app(selectedTask, l)} · ${AppCopy.time(l)}", 14f, Design.forest, true))
         space(body, 14)
         body.addView(text(AppCopy.intro(selectedTask, l), 17f, Design.secondary).apply { setLineSpacing(dp(3).toFloat(), 1f) })
-        if (taskSuggestedByAi) {
-            space(body, 12)
-            body.addView(text(GuideContent.intentMatched(l), 15f, Design.forest))
-        }
+        addGoalSource(body)
         val block = TaskAvailability.block(this, selectedTask)
         val phoneTrial = block == null && TaskAvailability.experimental(this, selectedTask)
         if (block != null) {
@@ -704,7 +704,7 @@ class MainActivity : Activity() {
             selectedTask = task
             selectedHelp = preferences.setupHelp
             preferences.setupTask = null
-            taskSuggestedByAi = false
+            goalSource = GoalSource.SHORTCUT
             if (preferences.active) showRecovery() else showTask()
         } else showHome()
     }
@@ -868,7 +868,7 @@ class MainActivity : Activity() {
             selectedHelp = preferences.helpMode
             preferences.finish(PracticeOutcome.ENDED)
             preferences.receiptPending = false
-            taskSuggestedByAi = false
+            goalSource = GoalSource.SHORTCUT
             showTask()
         })
         space(body, 10)
@@ -915,7 +915,7 @@ class MainActivity : Activity() {
             card.addView(action(c("再试一次，自选帮助", "再试一次，自己拣帮助", "Try again with your choice of help"), Design.paleGreen, Design.forest, 52) {
                 selectedTask = record.task
                 selectedHelp = HelpMode.FULL
-                taskSuggestedByAi = false
+                goalSource = GoalSource.SHORTCUT
                 showTask()
             }.apply { contentDescription = c("再试一次：$title", "再试一次：$title", "Try again: $title") })
             body.addView(card)
@@ -959,6 +959,16 @@ class MainActivity : Activity() {
         runner().showSettings()
     }
 
+    private fun addGoalSource(body: LinearLayout) {
+        val explanation = when (goalSource) {
+            GoalSource.MODEL -> GuideContent.intentMatched(preferences.textLanguage)
+            GoalSource.LOCAL -> GuideContent.intentLocalFallback(preferences.textLanguage)
+            GoalSource.SHORTCUT -> return
+        }
+        space(body, 12)
+        body.addView(text(explanation, 16f, Design.secondary))
+    }
+
     private fun showConfirm() {
         stopInput()
         screen = Screen.CONFIRM
@@ -968,6 +978,7 @@ class MainActivity : Activity() {
             setPadding(dp(22), dp(28), dp(22), dp(24))
         }
         body.addView(text(c("你要做的是：${taskTitle(selectedTask)}。对不对？", "你要做的是：${taskTitle(selectedTask)}。对不对？", "You want to: ${taskTitle(selectedTask)}. Is that right?"), 28f, Design.ink, true).heading())
+        addGoalSource(body)
         space(body, 28)
         body.addView(action(c("对", "对", "Yes"), Design.forest, Design.surface, 72) { showTask() })
         space(body, 12)

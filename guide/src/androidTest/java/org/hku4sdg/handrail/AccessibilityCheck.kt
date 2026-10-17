@@ -77,6 +77,9 @@ class AccessibilityCheck : Instrumentation() {
         }
     }
     override fun onStart() {
+        if (argumentsCheck == "ai" || argumentsCheck == "ai-offline") {
+            AiVoiceCheck(this, argumentsCheck == "ai-offline").run(); return
+        }
         if (argumentsCheck == "reliability") { ReliabilityCheck(this).run(); return }
         if (integrationCheck) { IntegrationCheck(this).run(); return }
         if (phoneCheck) { PhoneSettingsCheck(this).run(); return }
