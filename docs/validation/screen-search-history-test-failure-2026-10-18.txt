@@ -1,0 +1,11 @@
+
+Waiting for service rebind
+
+FAIL: Wrong target: Wikipedia
+Real model, Mandarin text + Cantonese speech text: 点击页面右上角的「Settings」选项，打开该应用的设置页面 / 喺页面右上角㩒「Settings」，打开呢个应用嘅设置页面
+Replay of model-generated Cantonese instruction reached Android MediaPlayer.start
+User test gesture on actual node n55, Settings, Rect(818, 158 - 944, 284)
+F-Droid: unregistered app, real controls -> Settings -> model result -> explicit user confirmation
+User test gesture on actual node n60, Search, Rect(367, 2127 - 713, 2337)
+
+Test cleanup: guide rebound

@@ -168,6 +168,7 @@ class VoiceHandler(BaseHTTPRequestHandler):
     used_characters = 0
     used_intent_requests = 0
     used_asr_requests = 0
+    used_screen_requests = 0
 
     def do_GET(self):
         if self.path != "/health":
@@ -181,11 +182,13 @@ class VoiceHandler(BaseHTTPRequestHandler):
             "used_intent_requests": self.used_intent_requests,
             "used_asr_requests": self.used_asr_requests,
             "used_tts_requests": self.used_requests,
+            "screen_ready": bool(os.environ.get("ARK_API_KEY")),
+            "used_screen_requests": self.used_screen_requests,
             "remaining_demo_characters": MAX_DEMO_CHARACTERS - self.used_characters,
         })
 
     def do_POST(self):
-        if self.path not in {"/tts", "/intent", "/asr"}:
+        if self.path not in {"/tts", "/intent", "/asr", "/screen-step"}:
             self.send_error(404)
             return
         if self.path == "/intent":
@@ -193,6 +196,9 @@ class VoiceHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/asr":
             self.handle_asr()
+            return
+        if self.path == "/screen-step":
+            self.handle_screen()
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -252,6 +258,37 @@ class VoiceHandler(BaseHTTPRequestHandler):
             return
         except (urllib.error.URLError, RuntimeError, TimeoutError, IndexError):
             self.respond_json(502, {"error": "Intent model unavailable"})
+            return
+        self.respond_json(200, result)
+
+    def handle_screen(self):
+        try:
+            from screen_planner import plan, validate_request, blocked_request
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 1 <= length <= 900000:
+                raise ValueError("Invalid screen request size")
+            data = validate_request(json.loads(self.rfile.read(length)))
+            key = os.environ.get("ARK_API_KEY", "")
+            if not key and not blocked_request(data):
+                self.respond_json(503, {"error": "Screen model is not configured"})
+                return
+            with self.budget_lock:
+                if self.used_screen_requests >= 60:
+                    self.respond_json(429, {"error": "Screen demo budget exhausted"})
+                    return
+                type(self).used_screen_requests += 1
+            result = plan(data, key)
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+            self.respond_json(400, {"error": "Invalid screen request"})
+            return
+        except RuntimeError as exc:
+            reasons = {"Invalid screen result", "Invalid screen decision", "Invalid instruction", "Unsafe instruction",
+                "Instruction did not follow the selected language", "Unexpected target", "Target is not an allowed current control",
+                "Incomplete screen response", "Unusable screen response"}
+            self.respond_json(502, {"error": "Screen model unavailable", "reason": str(exc) if str(exc) in reasons else "Invalid provider response"})
+            return
+        except (OSError, TimeoutError) as exc:
+            self.respond_json(502, {"error": "Screen model unavailable", "reason": type(exc).__name__})
             return
         self.respond_json(200, result)
 

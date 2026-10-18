@@ -120,11 +120,12 @@ internal class AiVoiceCheck(private val runner: Instrumentation, private val off
                 home(); submit("Make my phone easier to read")
                 find(GuideContent.intentClarify(GuideLanguage.MANDARIN)); check(!prefs.active); capture("clarify")
                 home(); submit("Send a message on WhatsApp")
-                find(GuideContent.intentUnsupported(GuideLanguage.MANDARIN)); check(!prefs.active); capture("unsupported")
+                find(ScreenGuideCopy.title(GuideLanguage.MANDARIN)); check(!prefs.active)
+                check(ScreenGuideSession.current == null); capture("screen-guide-consent-required")
                 home(); submit("Please enter my password 12345678")
                 find("这段文字可能涉及私人内容，已停止发送。请使用下方任务卡。")
                 check(!prefs.active); capture("private-guard")
-                events += "Clarification and unsupported requests stay on home; private goal blocked locally; no automatic task start"
+                events += "Clarification stays on home; unsupported task offers screen-guide setup without starting; private goal blocked locally"
             }
             events += "LIMIT: no microphone-input, native-speaker listening or phone/cloud-deployment acceptance"
             code = Activity.RESULT_OK

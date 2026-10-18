@@ -12,6 +12,9 @@ from http.server import ThreadingHTTPServer
 
 import voice_proxy
 
+# Loopback fixture traffic must not go through macOS's configured HTTP proxy.
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 
 class VoiceProxyTest(unittest.TestCase):
     def test_cantonese_sets_dialect_and_joins_streamed_audio(self):
@@ -116,7 +119,7 @@ class VoiceProxyTest(unittest.TestCase):
                 headers={"Content-Type": "application/json"}, method="POST")
             with patch.dict(os.environ, {"ARK_API_KEY": ""}):
                 with self.assertRaises(urllib.error.HTTPError) as error:
-                    urllib.request.urlopen(request, timeout=2)
+                    LOCAL.open(request, timeout=2)
             self.assertEqual(error.exception.code, 503)
             error.exception.close()
         finally:
@@ -135,7 +138,7 @@ class VoiceProxyTest(unittest.TestCase):
                 headers={"Content-Type": "application/json"}, method="POST")
             with patch.dict(os.environ, {"ARK_API_KEY": "test-key"}), patch.object(
                     voice_proxy, "classify_intent") as provider:
-                with urllib.request.urlopen(request, timeout=2) as response:
+                with LOCAL.open(request, timeout=2) as response:
                     self.assertEqual(json.load(response), {"decision": "unsupported", "task_id": ""})
                 provider.assert_not_called()
         finally:
@@ -153,7 +156,7 @@ class VoiceProxyTest(unittest.TestCase):
                     "asr_client.recognize", return_value="我想收藏網頁") as provider:
                 request = urllib.request.Request(base, data=b"\0" * 16000,
                     headers={"X-Guide-Language": "cantonese"}, method="POST")
-                with urllib.request.urlopen(request, timeout=2) as response:
+                with LOCAL.open(request, timeout=2) as response:
                     self.assertEqual(json.load(response), {"text": "我想收藏網頁"})
                 provider.assert_called_once_with(b"\0" * 16000, "cantonese", "test-key")
                 for audio, language in [(b"\0" * 15998, "english"),
@@ -163,7 +166,7 @@ class VoiceProxyTest(unittest.TestCase):
                         bad = urllib.request.Request(base, data=audio,
                             headers={"X-Guide-Language": language}, method="POST")
                         with self.assertRaises(urllib.error.HTTPError) as error:
-                            urllib.request.urlopen(bad, timeout=2)
+                            LOCAL.open(bad, timeout=2)
                         self.assertEqual(error.exception.code, 400)
                         error.exception.close()
                 self.assertEqual(provider.call_count, 1)

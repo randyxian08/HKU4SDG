@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "version_code": 5,
+  "base_commit": "04c44fba4399848594963779119d302e0bd25037",
+  "build_id": "04c44fb-dirty/2026-10-18T08:33:47.250055Z",
+  "apk_sha256": "149345c5df0e225482983703527c6f971a0813d71f68c0742fb1670982f6f9c6",
+  "kotlin_tests": 44,
+  "kotlin_failures": 0,
+  "python_tests": 28,
+  "lint": {
+    "guide": {
+      "Error": 0,
+      "Warning": 10
+    },
+    "demo-target": {
+      "Error": 0,
+      "Warning": 3
+    }
+  }
+}

@@ -32,7 +32,7 @@ internal class GuideOverlay(private val service: AccessibilityService) {
     private var protectedAreas: List<Rect> = emptyList()
     private fun dp(value: Int) = service.dp(value)
     private fun c(l: GuideLanguage, zh: String, yue: String, en: String) = ExperienceCopy.choose(l, zh, yue, en)
-    fun resetPosition() { preferred = null; moveRequested = false }
+    fun resetPosition() { preferred = null; moveRequested = false; screenMore = false }
     fun move() { preferred = if (lastSide == OverlaySide.TOP) OverlaySide.BOTTOM else OverlaySide.TOP; moveRequested = true }
     fun clear() {
         ring?.let { runCatching { wm.removeViewImmediate(it) } }
@@ -96,6 +96,56 @@ internal class GuideOverlay(private val service: AccessibilityService) {
         })
     }
     private var picker: String? = null
+    private var screenMore = false
+    fun showScreenAdvice(message: String, bounds: Rect?, scrollForward: Boolean?, language: GuideLanguage,
+        collapsed: Boolean, busy: Boolean, paused: Boolean, complete: Boolean,
+        onReplay: () -> Unit, onNext: () -> Unit, onCollapse: () -> Unit, onRedraw: () -> Unit,
+        onMove: () -> Unit, onPause: () -> Unit, onEdit: () -> Unit, onEnd: () -> Unit,
+        onConfirm: () -> Unit, onLanguages: () -> Unit, onUnavailable: () -> Unit, avoidAreas: List<Rect> = emptyList()) {
+        clearIndicators(); protectedAreas = avoidAreas; onNoRoom = onUnavailable
+        if (scrollForward != null) addArrow(scrollForward, c(language,
+            if (scrollForward) "手指向上滑" else "手指向下滑",
+            if (scrollForward) "手指向上扫" else "手指向下扫",
+            if (scrollForward) "Swipe your finger up" else "Swipe your finger down"))
+        else if (bounds != null && !busy && !paused) addRing(bounds)
+        val content = column(); val controls = column()
+        content.addView(label(ScreenGuideCopy.title(language), 14f, Design.forest, true))
+        if (!collapsed || busy || paused || complete) {
+            gap(content, 8)
+            content.addView(label(message, 18f, bold = true).apply {
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            })
+        }
+        val primary = content.childCount
+        if (screenMore) {
+            gap(content, 10)
+            pair(content, tap(c(language, "换位置", "换个位", "Move"), click = onMove),
+                tap(if (paused) c(language, "继续", "继续", "Resume") else c(language, "暂停", "暂停", "Pause"), click = onPause))
+            gap(content, 6)
+            pair(content, tap(c(language, "补充目标", "补充目标", "Refine goal"), click = onEdit),
+                tap(c(language, "语言", "语言", "Languages"), click = onLanguages))
+            gap(content, 6)
+            content.addView(tap(c(language, "结束引导", "结束指引", "End guide"), click = onEnd))
+        }
+        if (complete) {
+            controls.addView(tap(c(language, "我确认完成了", "我确认完成咗", "I confirm it is done"), Design.forest, Design.surface, onConfirm))
+            gap(controls, 6)
+        }
+        pair(controls, tap(c(language, "听一次", "听一次", "Play once"), click = onReplay),
+            tap(if (paused) c(language, "继续看屏幕", "继续睇屏幕", "Resume")
+                else c(language, "看下一步", "睇下一步", "Check next step"), Design.forest, Design.surface, onNext))
+        gap(controls, 6)
+        pair(controls, tap(if (collapsed) c(language, "展开文字", "打开文字", "Show text")
+                else c(language, "收起文字", "收起文字", "Hide text"), click = onCollapse),
+            tap(if (screenMore) c(language, "收起更多", "收起更多", "Close options") else c(language, "更多", "更多", "More")) {
+                screenMore = !screenMore; onRedraw()
+            })
+        val avoid = if (scrollForward != null) null else bounds
+        showCard(content, controls, avoid, language, primary)
+    }
+
+    fun invalidateScreenTarget() { clearIndicators() }
+
     fun showStep(step: GuideStep, bounds: Rect?, message: String, avoidAreas: List<Rect> = emptyList(),
         textLanguage: GuideLanguage, voiceLanguage: GuideLanguage,
         collapsed: Boolean, muted: Boolean, independent: Boolean, adjusting: Boolean,
@@ -216,13 +266,14 @@ internal class GuideOverlay(private val service: AccessibilityService) {
         gap(controls); controls.addView(tap(c(l, "结束引导", "结束指引", "End guide"), Design.background, Design.secondary, onEnd))
         showCard(content, controls, null, l)
     }
-    fun showReceipt(confirmed: Boolean, l: GuideLanguage, onStay: () -> Unit, onReturn: () -> Unit) {
+    fun showReceipt(confirmed: Boolean, l: GuideLanguage, onStay: () -> Unit, onReturn: () -> Unit, recorded: Boolean = true) {
         clearIndicators(); onNoRoom = null; protectedAreas = emptyList()
         val content = column(); val controls = column()
         content.addView(label(if (confirmed) c(l, "你已确认完成", "你已确认完成", "You confirmed completion")
             else c(l, "这次引导已结束", "今次指引结束咗", "This guide has ended"), 22f, bold = true).heading())
         gap(content, 10)
-        content.addView(label(if (confirmed) c(l, "已记录这次完成。以后需要帮助，可以再叫我。", "记录咗今次完成。之后需要帮助，可以再叫我。", "This completion is recorded. You can ask for help again anytime.")
+        content.addView(label(if (confirmed && !recorded) c(l, "结果已由你确认。本次页面内容未写入本机记录。", "结果由你确认咗。今次页面内容冇写入本机记录。", "You confirmed the result. Page content was not saved in local history.")
+            else if (confirmed) c(l, "已记录这次完成。以后需要帮助，可以再叫我。", "记录咗今次完成。之后需要帮助，可以再叫我。", "This completion is recorded. You can ask for help again anytime.")
             else c(l, "尚未确认完成。你可以随时重新开始。", "未确认完成。你随时可以重新开始。", "Completion was not confirmed. You can try again anytime."), 18f))
         controls.addView(tap(c(l, "返回数字扶手", "返数字扶手", "Return to Digital Handrail"), Design.forest, Design.surface, onReturn))
         gap(controls, 8); controls.addView(tap(c(l, "留在这里", "留喺呢度", "Stay here"), click = onStay))

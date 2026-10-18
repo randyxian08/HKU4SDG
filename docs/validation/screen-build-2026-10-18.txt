@@ -1,0 +1,221 @@
+> Task :guide:preBuild UP-TO-DATE
+> Task :guide:preDebugBuild UP-TO-DATE
+> Task :guide:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :guide:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :guide:generateDebugBuildConfig
+> Task :guide:checkDebugAarMetadata UP-TO-DATE
+> Task :guide:processDebugNavigationResources UP-TO-DATE
+> Task :guide:compileDebugNavigationResources UP-TO-DATE
+> Task :guide:generateDebugResValues UP-TO-DATE
+> Task :guide:mapDebugSourceSetPaths UP-TO-DATE
+> Task :guide:generateDebugResources UP-TO-DATE
+> Task :guide:mergeDebugResources UP-TO-DATE
+> Task :guide:packageDebugResources UP-TO-DATE
+> Task :guide:parseDebugLocalResources UP-TO-DATE
+> Task :guide:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :guide:extractDeepLinksDebug UP-TO-DATE
+> Task :guide:processDebugMainManifest UP-TO-DATE
+> Task :guide:processDebugManifest UP-TO-DATE
+> Task :guide:processDebugManifestForPackage UP-TO-DATE
+> Task :guide:processDebugResources UP-TO-DATE
+> Task :guide:javaPreCompileDebug UP-TO-DATE
+> Task :guide:mergeDebugShaders UP-TO-DATE
+> Task :guide:compileDebugShaders NO-SOURCE
+> Task :guide:generateDebugAssets UP-TO-DATE
+> Task :guide:mergeDebugAssets UP-TO-DATE
+> Task :guide:compressDebugAssets UP-TO-DATE
+> Task :guide:desugarDebugFileDependencies UP-TO-DATE
+> Task :guide:checkDebugDuplicateClasses UP-TO-DATE
+> Task :guide:mergeExtDexDebug UP-TO-DATE
+> Task :guide:mergeLibDexDebug UP-TO-DATE
+> Task :guide:mergeDebugJniLibFolders UP-TO-DATE
+> Task :guide:mergeDebugNativeLibs NO-SOURCE
+> Task :guide:stripDebugDebugSymbols NO-SOURCE
+> Task :guide:validateSigningDebug UP-TO-DATE
+> Task :guide:writeDebugAppMetadata UP-TO-DATE
+> Task :guide:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :guide:preReleaseBuild UP-TO-DATE
+> Task :guide:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :guide:mergeReleaseNativeLibs NO-SOURCE
+> Task :guide:stripReleaseDebugSymbols NO-SOURCE
+> Task :guide:extractReleaseNativeSymbolTables NO-SOURCE
+> Task :guide:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :guide:checkReleaseDuplicateClasses UP-TO-DATE
+> Task :guide:buildKotlinToolingMetadata UP-TO-DATE
+> Task :guide:generateReleaseBuildConfig
+> Task :guide:checkReleaseAarMetadata UP-TO-DATE
+> Task :guide:processReleaseNavigationResources UP-TO-DATE
+> Task :guide:compileReleaseNavigationResources UP-TO-DATE
+> Task :guide:generateReleaseResValues UP-TO-DATE
+> Task :guide:mapReleaseSourceSetPaths UP-TO-DATE
+> Task :guide:generateReleaseResources UP-TO-DATE
+> Task :guide:mergeReleaseResources UP-TO-DATE
+> Task :guide:packageReleaseResources UP-TO-DATE
+> Task :guide:parseReleaseLocalResources UP-TO-DATE
+> Task :guide:createReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :guide:extractDeepLinksRelease UP-TO-DATE
+> Task :guide:processReleaseMainManifest UP-TO-DATE
+> Task :guide:processReleaseManifest UP-TO-DATE
+> Task :guide:processReleaseManifestForPackage UP-TO-DATE
+> Task :guide:processReleaseResources UP-TO-DATE
+> Task :guide:javaPreCompileRelease UP-TO-DATE
+> Task :guide:desugarReleaseFileDependencies UP-TO-DATE
+> Task :guide:mergeReleaseStartupProfile UP-TO-DATE
+> Task :guide:mergeExtDexRelease UP-TO-DATE
+> Task :guide:mergeReleaseArtProfile UP-TO-DATE
+> Task :guide:mergeReleaseShaders UP-TO-DATE
+> Task :guide:compileReleaseShaders NO-SOURCE
+> Task :guide:generateReleaseAssets UP-TO-DATE
+> Task :guide:mergeReleaseAssets UP-TO-DATE
+> Task :guide:compressReleaseAssets UP-TO-DATE
+> Task :guide:extractReleaseVersionControlInfo UP-TO-DATE
+> Task :guide:extractProguardFiles UP-TO-DATE
+> Task :guide:optimizeReleaseResources UP-TO-DATE
+> Task :guide:collectReleaseDependencies UP-TO-DATE
+> Task :guide:sdkReleaseDependencyData UP-TO-DATE
+> Task :guide:writeReleaseAppMetadata UP-TO-DATE
+> Task :guide:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :guide:preDebugAndroidTestBuild SKIPPED
+> Task :guide:processDebugAndroidTestManifest UP-TO-DATE
+> Task :guide:generateDebugAndroidTestBuildConfig
+> Task :guide:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :guide:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :guide:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :guide:generateDebugAndroidTestResValues UP-TO-DATE
+> Task :guide:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :guide:generateDebugAndroidTestResources UP-TO-DATE
+> Task :guide:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :guide:processDebugAndroidTestResources UP-TO-DATE
+> Task :guide:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :guide:mergeDebugAndroidTestShaders UP-TO-DATE
+> Task :guide:compileDebugAndroidTestShaders NO-SOURCE
+> Task :guide:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :guide:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :guide:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :guide:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :guide:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :guide:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :guide:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :guide:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :guide:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :guide:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :guide:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :guide:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :demo-target:preBuild UP-TO-DATE
+> Task :demo-target:preDebugBuild UP-TO-DATE
+> Task :demo-target:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :demo-target:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :demo-target:checkDebugAarMetadata UP-TO-DATE
+> Task :demo-target:processDebugNavigationResources UP-TO-DATE
+> Task :demo-target:compileDebugNavigationResources UP-TO-DATE
+> Task :demo-target:generateDebugResValues UP-TO-DATE
+> Task :demo-target:mapDebugSourceSetPaths UP-TO-DATE
+> Task :demo-target:generateDebugResources UP-TO-DATE
+> Task :demo-target:mergeDebugResources UP-TO-DATE
+> Task :demo-target:packageDebugResources UP-TO-DATE
+> Task :demo-target:parseDebugLocalResources UP-TO-DATE
+> Task :demo-target:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :demo-target:extractDeepLinksDebug UP-TO-DATE
+> Task :demo-target:processDebugMainManifest UP-TO-DATE
+> Task :demo-target:processDebugManifest UP-TO-DATE
+> Task :demo-target:processDebugManifestForPackage UP-TO-DATE
+> Task :demo-target:processDebugResources UP-TO-DATE
+> Task :demo-target:compileDebugKotlin UP-TO-DATE
+> Task :demo-target:javaPreCompileDebug UP-TO-DATE
+> Task :demo-target:compileDebugJavaWithJavac NO-SOURCE
+> Task :demo-target:mergeDebugShaders UP-TO-DATE
+> Task :demo-target:compileDebugShaders NO-SOURCE
+> Task :demo-target:generateDebugAssets UP-TO-DATE
+> Task :demo-target:mergeDebugAssets UP-TO-DATE
+> Task :demo-target:compressDebugAssets UP-TO-DATE
+> Task :demo-target:desugarDebugFileDependencies UP-TO-DATE
+> Task :demo-target:dexBuilderDebug UP-TO-DATE
+> Task :demo-target:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :demo-target:processDebugJavaRes UP-TO-DATE
+> Task :demo-target:mergeDebugJavaResource UP-TO-DATE
+> Task :demo-target:checkDebugDuplicateClasses UP-TO-DATE
+> Task :demo-target:mergeExtDexDebug UP-TO-DATE
+> Task :demo-target:mergeLibDexDebug UP-TO-DATE
+> Task :demo-target:mergeProjectDexDebug UP-TO-DATE
+> Task :demo-target:mergeDebugJniLibFolders UP-TO-DATE
+> Task :demo-target:mergeDebugNativeLibs NO-SOURCE
+> Task :demo-target:stripDebugDebugSymbols NO-SOURCE
+> Task :demo-target:validateSigningDebug UP-TO-DATE
+> Task :demo-target:writeDebugAppMetadata UP-TO-DATE
+> Task :demo-target:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :demo-target:packageDebug UP-TO-DATE
+> Task :demo-target:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :demo-target:assembleDebug UP-TO-DATE
+> Task :guide:preDebugUnitTestBuild UP-TO-DATE
+> Task :guide:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :demo-target:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :demo-target:preDebugAndroidTestBuild SKIPPED
+> Task :demo-target:generateDebugAndroidTestResValues UP-TO-DATE
+> Task :demo-target:generateDebugAndroidTestLintModel UP-TO-DATE
+> Task :demo-target:extractProguardFiles UP-TO-DATE
+> Task :demo-target:generateDebugLintReportModel UP-TO-DATE
+> Task :demo-target:preDebugUnitTestBuild UP-TO-DATE
+> Task :demo-target:generateDebugUnitTestLintModel UP-TO-DATE
+> Task :demo-target:lintAnalyzeDebug UP-TO-DATE
+> Task :demo-target:lintAnalyzeDebugAndroidTest UP-TO-DATE
+> Task :demo-target:lintAnalyzeDebugUnitTest UP-TO-DATE
+> Task :demo-target:lintReportDebug UP-TO-DATE
+> Task :demo-target:lintDebug
+> Task :guide:compileReleaseKotlin
+> Task :guide:compileDebugKotlin
+> Task :guide:compileReleaseJavaWithJavac
+> Task :guide:compileDebugJavaWithJavac
+> Task :guide:dexBuilderDebug
+> Task :guide:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :guide:processDebugJavaRes UP-TO-DATE
+> Task :guide:mergeDebugJavaResource UP-TO-DATE
+> Task :guide:dexBuilderRelease
+> Task :guide:mergeReleaseGlobalSynthetics UP-TO-DATE
+> Task :guide:generateReleaseLintVitalReportModel
+> Task :guide:mergeProjectDexDebug
+> Task :guide:processReleaseJavaRes UP-TO-DATE
+> Task :guide:mergeReleaseJavaResource UP-TO-DATE
+> Task :guide:generateDebugLintReportModel
+> Task :guide:bundleDebugClassesToCompileJar
+> Task :guide:bundleDebugClassesToRuntimeJar
+> Task :guide:packageDebug
+> Task :guide:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :guide:assembleDebug
+> Task :guide:generateDebugAndroidTestLintModel
+> Task :guide:generateDebugUnitTestLintModel
+> Task :guide:compileDebugUnitTestKotlin
+> Task :guide:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :guide:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :guide:mergeDexRelease
+
+> Task :guide:compileDebugAndroidTestKotlin
+w: file:///Users/randy/.codex/worktrees/screen-guidance/HKU4SDG/guide/src/androidTest/java/org/hku4sdg/handrail/ScreenGuideCheck.kt:200:34 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AccessibilityNodeInfo'.
+
+> Task :guide:testDebugUnitTest
+> Task :guide:compileReleaseArtProfile
+> Task :guide:compileDebugAndroidTestJavaWithJavac
+> Task :guide:dexBuilderDebugAndroidTest
+> Task :guide:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :guide:processDebugAndroidTestJavaRes UP-TO-DATE
+> Task :guide:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :guide:mergeProjectDexDebugAndroidTest
+> Task :guide:packageDebugAndroidTest
+> Task :guide:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :guide:assembleDebugAndroidTest
+> Task :guide:lintAnalyzeDebugAndroidTest
+> Task :guide:lintVitalAnalyzeRelease
+> Task :guide:lintVitalReportRelease UP-TO-DATE
+> Task :guide:lintVitalRelease
+> Task :guide:packageRelease
+> Task :guide:createReleaseApkListingFileRedirect UP-TO-DATE
+> Task :guide:assembleRelease
+> Task :guide:lintAnalyzeDebugUnitTest
+> Task :guide:lintAnalyzeDebug
+
+> Task :guide:lintReportDebug
+Wrote HTML report to file:///Users/randy/.codex/worktrees/screen-guidance/HKU4SDG/guide/build/reports/lint-results-debug.html
+
+> Task :guide:lintDebug
+
+BUILD SUCCESSFUL in 5s
+175 actionable tasks: 35 executed, 140 up-to-date

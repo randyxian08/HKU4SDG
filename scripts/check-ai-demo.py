@@ -14,6 +14,7 @@ import urllib.request
 from voice_proxy import ARK_MODEL
 
 BASE = "http://127.0.0.1:8765"
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 CASES = [
     ("mandarin", "我想把手机上的字调大", "font_size", "请点圈住的字体大小。"),
     ("cantonese", "我想调光啲个手机屏幕", "screen_brightness", "请㩒圈住嘅亮度滑块。"),
@@ -36,7 +37,7 @@ def request(path, payload=None, language=None):
         headers.update({"Content-Type": "application/octet-stream", "X-Guide-Language": language})
     req = urllib.request.Request(BASE + path, data=payload, headers=headers)
     start = time.monotonic()
-    with urllib.request.urlopen(req, timeout=35) as response:
+    with LOCAL.open(req, timeout=35) as response:
         limit = 2_000_000 if path == "/tts" else 16_000
         data = response.read(limit + 1)
         if len(data) > limit:

@@ -45,7 +45,7 @@ object SupportCopy {
     fun setupHeading(l: GuideLanguage, enabled: Boolean) = if (enabled)
         c(l, "已经准备好了", "准备好喇", "Your guide is ready") else c(l, "让下一步更容易找到", "等你易啲搵到下一步", "Make the next step easier to find")
     fun setupWhy(l: GuideLanguage) = c(l, "开启无障碍服务，数字扶手才能在其他应用的已审核页面上圈出下一步。点击和拖动始终由你完成。", "开启无障碍服务，数字扶手先可以喺其他应用审核过嘅页面圈出下一步。㩒掣同拖动都系你自己做。", "Enable the accessibility service to highlight the next control on reviewed pages in other apps. You make every tap and drag.")
-    fun setupPrivacy(l: GuideLanguage) = c(l, "Android 会提示这项权限可读取屏幕并执行操作。数字扶手只匹配支持任务的必要控件，不代点，也不上传屏幕。你可随时在系统设置关闭。", "Android 会提示呢项权限可以读取屏幕同执行操作。数字扶手只配对支持任务要用嘅控件，唔代㩒，亦唔上传屏幕。你随时可以喺系统设置关闭。", "Android warns that this permission can read the screen and perform actions. Digital Handrail matches controls for supported tasks, never taps for you, and never uploads the screen. You can turn it off in Settings.")
+    fun setupPrivacy(l: GuideLanguage) = c(l, "Android 会提示这项权限可读取屏幕并执行操作。数字扶手不会代点。固定引导只核对必要控件；AI 屏幕引导须另行同意，才发送所选 App 的控件文字，截图也须另选。你可随时停止或在系统设置关闭。", "Android 会提示呢项权限可以读取屏幕同执行操作。数字扶手唔会代㩒。固定指引只核对必要控件；AI 屏幕指引要另外同意先发送所拣 App 嘅控件文字，截图亦要另拣。你随时可以停止，或者喺系统设置关闭。", "Android warns that this permission can read the screen and perform actions. Digital Handrail never taps for you. Fixed guides check necessary controls locally. AI screen guidance requires separate consent to send the selected app's control text; screenshots are optional. You can stop anytime or turn it off in Settings.")
     fun setupSteps(l: GuideLanguage) = listOf(
         c(l, "在系统页面选“数字扶手 · 手机引导”", "喺系统页面拣「数字扶手 · 手机引导」", "Choose “数字扶手 · 手机引导” in Settings"),
         c(l, "打开该服务的开关，阅读并确认系统提示", "开启服务嘅开关，睇同确认系统提示", "Turn on this service, then read and confirm Android's prompt"),

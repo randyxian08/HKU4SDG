@@ -195,6 +195,11 @@ class PracticeActivity : Activity() {
             id = R.id.private_panel
             setLineSpacing(dp(5).toFloat(), 1f)
         })
+        space(body, 18)
+        body.addView(android.widget.EditText(this).apply {
+            hint = "虚构密码测试，不填写"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        })
     }
 
     private fun unknown(body: LinearLayout) {

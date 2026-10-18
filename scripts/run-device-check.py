@@ -10,7 +10,7 @@ import sys
 import time
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("check", choices=["reliability", "integration", "overlay", "phone", "a11y", "ai", "ai-offline"])
+parser.add_argument("check", choices=["reliability", "integration", "overlay", "phone", "a11y", "ai", "ai-offline", "screen", "screen-offline"])
 parser.add_argument("--task", choices=["font", "brightness"], default="font")
 parser.add_argument("--serial", default="emulator-5554")
 args = parser.parse_args()

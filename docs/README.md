@@ -1,6 +1,6 @@
 # 数字扶手｜文档导航
 
-更新于 2026-10-17。产品是一个原生 Android App，用户只安装 `guide`。四项演示基线见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)；0.1.1 另开放字体、亮度的手机实验引导，尚未逐机验收。Chrome、Maps 仍限定原演示环境及指定版本。
+更新于 2026-10-18。产品是一个原生 Android App，用户只安装 `guide`。0.2.0 新增独立的 AI 屏幕引导，见下方入口；原四项固定演示基线见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。固定流程中的 Chrome、Maps 继续限定原演示环境及指定版本，不能把新模式的通用控件读取当作逐 App 验收。
 
 ## 按需要阅读
 
@@ -9,8 +9,9 @@
 | 了解产品与安装方式 | [仓库 README](../README.md) | 当前功能、快速运行与适用边界 |
 | 在手机安装和尝试 | [手机测试指南](phone-testing.md) | 0.1.1 APK、字体／亮度实验路径、中文截图和未验证部分 |
 | 接手开发或运行检查 | [开发接手指南](development.md) | 当前目录、配置、命令和排查 |
+| 在其他 App 的当前页面使用 AI 引导 | [AI 屏幕引导](screen-guidance.md)、[本轮验收](validation/screen-guidance-2026-10-18.md) | 0.2.0 新入口、控件／可选截图、同意、动态判断和运行证据 |
 | 运行 AI／三语语音并准备比赛说明 | [AI 与三语语音](ai-voice-demo-2026-10-17.md)、[验收](validation/ai-voice-2026-10-17.md) | 0.1.3 TTS 修正、模型用途、启动、真实调用与离线退路 |
-| 写路演稿或回答 GenAI 评分问题 | [GenAI 路演说明](pitch-genai.md) | 与飞书同步的产品叙事、六项说明、证据和待补材料 |
+| 写路演稿或回答 GenAI 评分问题 | [GenAI 路演说明](pitch-genai.md) | 已更新至 0.2.0 的产品叙事、六项说明、证据和待补材料；飞书旧版进度另标日期 |
 | 准备演示与案例讲述 | [可演示案例](demo-cases.md) | 已测场景与演示脚本；不是真人试用结果 |
 | 看最新浮窗、亮度与服务诊断 | [0.1.2 引导优化](guide-reliability-2026-10-09.md)、[验证摘要](validation/reliability-2026-10-09.md) | 预览避让、稳定窗口、结束回执、亮度分支和未证实问题 |
 | 看此前首页、首次设置与浮窗 | [PR #11 整合记录](ui-integration-2026-10-09.md) | 需求优先的首页、三语设置、完成判断和模拟器证据 |

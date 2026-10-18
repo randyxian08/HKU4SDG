@@ -23,6 +23,7 @@ class GuideAccessibilityService : AccessibilityService() {
     private lateinit var overlay: GuideOverlay
     private var tts: TextToSpeech? = null
     private var cloudTts: CloudTts? = null
+    private var screenGuide: ScreenGuideController? = null
     private var ttsReady = false
     private var shownStep: GuideStep? = null
     private var chromeVerified = false
@@ -47,6 +48,8 @@ class GuideAccessibilityService : AccessibilityService() {
         overlay = GuideOverlay(this)
         tts = TextToSpeech(this) { ttsReady = it == TextToSpeech.SUCCESS }
         cloudTts = CloudTts(this)
+        screenGuide = ScreenGuideController(this, overlay, preferences, ::speakScreen) { tts?.stop(); cloudTts?.stop() }
+        liveService = this
         connected = true
         ServiceDiagnostics.record(this, "service_connected")
         preferences.pause(PauseReason.SERVICE_RESTART)
@@ -54,6 +57,7 @@ class GuideAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (screenGuide?.onEvent(event) == true) return
         if (!::overlay.isInitialized || !preferences.active) {
             if (receiptVisible && rootInActiveWindow?.packageName?.toString() in allowedPackages()) return
             receiptVisible = false
@@ -149,11 +153,14 @@ class GuideAccessibilityService : AccessibilityService() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         clearFeedback()
+        if (screenGuide?.onEvent(null) == true) return
         if (::preferences.isInitialized && preferences.active) render(true)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         connected = false
+        screenGuide?.close()
+        liveService = null
         ServiceDiagnostics.record(this, "service_unbound")
         handler.removeCallbacksAndMessages(null)
         departureCheck = null
@@ -164,6 +171,8 @@ class GuideAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         connected = false
+        screenGuide?.close()
+        liveService = null
         ServiceDiagnostics.record(this, "service_destroyed")
         if (::preferences.isInitialized) preferences.pause(PauseReason.SERVICE_RESTART)
         handler.removeCallbacksAndMessages(null)
@@ -574,9 +583,19 @@ class GuideAccessibilityService : AccessibilityService() {
             ?: speakOnDevice(message, language, explicit)
     }
 
+    private fun speakScreen(message: String, language: GuideLanguage) {
+        val run = ScreenGuideSession.current ?: return
+        if (screenGuide?.hasSelectedWindow != true) return
+        cloudTts?.speak(message, language, onStarted = { screenSpeechStarts++ }, onUnavailable = { speakOnDevice(message, language, explicit = true) })
+            ?: speakOnDevice(message, language, explicit = true)
+    }
+
     private fun speakOnDevice(message: String, language: GuideLanguage, explicit: Boolean = false, receipt: Boolean = false) {
+        val screenSession = ScreenGuideSession.current
+        val screenSpeech = screenSession != null && screenGuide?.hasSelectedWindow == true &&
+            (!screenSession.paused || explicit)
         if ((preferences.muted && !explicit) || !ttsReady ||
-            (!preferences.sessionState.canConfirm && !(receipt && receiptVisible && rootInActiveWindow?.packageName?.toString() in allowedPackages()))) return
+            (!screenSpeech && !preferences.sessionState.canConfirm && !(receipt && receiptVisible && rootInActiveWindow?.packageName?.toString() in allowedPackages()))) return
         val engine = tts ?: return
         val locale = language.locale
         val support = engine.isLanguageAvailable(locale)
@@ -656,6 +675,11 @@ class GuideAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private var liveService: GuideAccessibilityService? = null
+        internal val screenDebug get() = liveService?.screenGuide
+        @Volatile internal var screenSpeechStarts = 0
+            private set
+        fun refreshScreenGuide() { liveService?.let { service -> service.handler.post { service.screenGuide?.onEvent(null) } } }
         @Volatile var connected = false
             private set
         private const val SETTINGS_PACKAGE = "com.android.settings"
