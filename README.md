@@ -1,86 +1,85 @@
-# 数字扶手｜HKU4SDG
+# Digital Handrail | HKU4SDG
 
-**你自己动手，我们陪你走下一步。**
+**You take the action. We help you find the next step.**
 
-数字扶手是一款面向手机操作求助场景的原生 Android 应用。用户先说出或输入目标，可以使用固定任务，也可以选择一个 App 开启 AI 屏幕引导；数字扶手圈出当前一步，提供可折叠文字和可选语音，用户亲手点击、拖动，最后确认结果。
+Digital Handrail is a native Android app for people who need help using their phone. Users speak or type a goal, choose a reviewed task or start AI screen guidance for an app, and follow one highlighted step at a time. Instructions can be read, collapsed, or spoken. Users tap, drag, and confirm the result themselves.
 
-用户只安装一个 `guide` APK。仓库中的 `demo-target` 是团队内部测试夹具，不是用户产品的安装前置条件。
+Users install one **guide APK**. The **demo-target** module is an internal test fixture, not a second product or an installation requirement.
 
-**下载安装：[Android 0.2.0 测试版 APK](https://github.com/randyxian08/HKU4SDG/releases/download/v0.2.0/digital-handrail-0.2.0-debug.apk) · [Release 说明与校验文件](https://github.com/randyxian08/HKU4SDG/releases/tag/v0.2.0)。** 最低 Android 8.0，安装步骤见[手机测试指南](docs/phone-testing.md)。
+**Download: [Android 0.2.0 test APK](https://github.com/randyxian08/HKU4SDG/releases/download/v0.2.0/digital-handrail-0.2.0-debug.apk) · [Release notes and checksums](https://github.com/randyxian08/HKU4SDG/releases/tag/v0.2.0).** Requires Android 8.0 or later. See the [phone testing guide](docs/phone-testing.md).
 
-这是开发签名的测试包。手机可尝试本机字体、亮度引导；云端 AI 屏幕引导和云端语音仍仅连接开发模拟器的电脑代理，尚不能在普通手机上独立使用云端功能。
+This is a development-signed test build. Phones can try local font-size and brightness guidance. **Cloud AI screen guidance and cloud speech currently require the Debug emulator and a computer-hosted proxy; they do not run independently on ordinary phones.**
 
-> 0.2.0 新增 [AI 屏幕引导](docs/screen-guidance.md)：用户选择 App 并同意后，模型分析当前可见控件，可另选提供窗口截图；每次只选一个真实控件，页面变化后撤圈并重新判断。无需给每个 App 预写一条固定任务，但仍依赖可读取的控件，不能宣称任意 App 已适配。云端连接当前仍限于 Debug 模拟器和电脑代理。
+> **0.2.0:** [AI screen guidance](docs/screen-guidance.md) sends visible controls from a user-selected app to the model after consent, with an optional window screenshot. Each step must refer to a real control. Screen changes remove the old highlight and trigger a new assessment. This does not require a predefined flow for every app, but still depends on readable accessibility controls and is not universal app support.
 
-> 0.1.3 修正当前火山 TTS 响应兼容问题，增加 AI／语音演示启动与真实调用检查，明确 AI 和本机匹配的来源。接入方式、比赛要求及验证边界见[AI 与三语语音](docs/ai-voice-demo-2026-10-17.md)。
+> **0.1.3:** Updated Volcano TTS response handling, added AI/speech startup and live-provider checks, and made model versus local matching explicit. See [AI and trilingual speech](docs/ai-voice-demo-2026-10-17.md).
 
-> 准备报告或路演时，先读[GenAI 路演说明](docs/pitch-genai.md)：产品叙事、六项技术评分说明、证据与待补材料。本文已更新至 0.2.0，飞书 10 月 17 日的补充仍属旧版进度。
+> For a competition presentation, start with the [GenAI pitch brief](docs/pitch-genai.md). It covers the product story, six technical assessment questions, evidence, and missing material. It reflects 0.2.0; the Feishu update dated October 17 describes the older 0.1.3 scope.
 
-> 0.1.2 新增浮窗预览避让、直接重播、明确结束回执、亮度目标选择及本机服务诊断。证据和仍未证实的问题见[引导优化记录](docs/guide-reliability-2026-10-09.md)。
+> **0.1.2:** Added preview avoidance, direct replay, explicit end receipts, brightness-goal choices, and local service diagnostics. See the [reliability changes](docs/guide-reliability-2026-10-09.md) for evidence and unresolved issues.
 
-> 四项演示基线见 [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6)。0.1.1 新增字体与亮度的手机实验引导；安装方法、中文页面截图和适用边界见[手机测试指南](docs/phone-testing.md)。
+> The original four-task baseline is [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6). Version 0.1.1 introduced experimental phone guidance for font size and brightness; installation, Chinese-system screenshots, and limits are in the [phone guide](docs/phone-testing.md).
 
-## 当前可以做什么
+## Current capabilities
 
-**AI 屏幕引导**从首页“看屏幕，帮我下一步”进入，选择 App 和目标，并单独确认页面内容处理。文字与播报语言独立设置；支持重播、主动查看下一步、暂停、补充目标和人工确认结束。本次页面内容与目标不写入练习记录。实际链路、隐私边界与复现方式见[屏幕引导说明](docs/screen-guidance.md)。
+**AI screen guidance** starts from “Help with this app's screen” on the home screen. Users select an app and a goal, then separately consent to page processing. Written and spoken languages are independent. Replay, manual refresh, pause, goal refinement, and explicit completion confirmation are available. Session goals and page content are not added to practice history. See the [data flow and limitations](docs/screen-guidance.md).
 
-下方是保留的**四项固定引导**，与新模式分开验收：
+The **four reviewed flows** remain available and are evaluated separately:
 
-四项任务的已审核演示设备是 **Android 15 / API 35、英文系统、`sdk_gphone64_arm64` 模拟器**。0.1.1 另允许 **Android 8–16 / API 26–36、中文或英文系统**尝试字体、亮度两项引导，首页标作“可试”。手机路径只在唯一识别到当前控件时圈画，无法核对时保留文字退路；这不代表已经逐机验收。Chrome、Maps 仍须符合原演示设备及完整应用版本。
+The reviewed demo environment is an **Android 15 / API 35, English-system, sdk_gphone64_arm64 emulator**. Since 0.1.1, font and brightness guidance can also be tried on **Android 8–16 / API 26–36 in Chinese or English**, with a “Try” availability status. Phone guidance highlights only a uniquely identified current control and falls back to text when it cannot verify one. Admission to a flow is not device acceptance. Chrome and Maps still require the reviewed emulator and exact app versions.
 
-| 任务 | 用户亲手操作 | 应用检测的结果 |
+| Task | User action | Detected result |
 |---|---|---|
-| 把字调大 | 在真实系统设置打开 `Display size and text`，拖动 `Font size` | 系统 `font_scale` 增加，再询问是否适合阅读 |
-| 调亮屏幕 | 先选择手动或随环境自动；手动路径进入真实设置并拖动滑块 | 手动值增加后等待确认；自动开关分支已实现，但当前模拟器无此控件，仅有合成测试 |
-| 收藏长者服务网页 | 在 Chrome **124.0.6367.219** 的指定 GovHK 页面操作书签 | 检测 `Edit bookmark`，等待用户确认；已有书签也可核验 |
-| 查图书馆地址 | 在 Google Maps **11.129.0103** 展开香港中央图书馆地点卡 | 指定地址行出现，等待用户确认看到了地址 |
+| Make text larger | Open Display size and text in real system Settings and drag Font size | System font_scale increases; the user then confirms readability |
+| Make the screen brighter | Choose manual or adaptive brightness; manually drag the real Settings slider when applicable | Manual value increases, then confirmation; adaptive-switch logic is implemented but only synthetically tested because this emulator lacks the switch |
+| Bookmark a senior-services webpage | Use the bookmark controls on the specified GovHK page in Chrome **124.0.6367.219** | Edit bookmark appears; the user confirms. Existing bookmarks can also be checked |
+| Find a library address | Expand the Hong Kong Central Library place card in Google Maps **11.129.0103** | The specified address row appears; the user confirms seeing it |
 
-地图任务只查看指定地点的地址，不提供路线导航。所有任务都由用户操作；未知页面撤圈，AI 不替用户点击、输入或提交。
+The Maps task displays an address, not route navigation. Users perform every action. Unknown pages lose their highlights; AI does not tap, type, or submit for the user.
 
-### 已实现的体验
+### Implemented experience
 
-- **三项独立语言设置**：输入、界面文字／AI 提示、语音播报分别选择普通话、粤语和英语。
-- **三档帮助**：完整指引、轻提示、自己先试试；按需请求当前一步提示。
-- **需求优先的首页**：先说话或输入一句需求，再确认匹配的任务；四个任务保留作快捷入口。不支持的需求会明确说明。
-- **浮窗**：默认一句当前提示加“听一次／更多”；收起后直接提供“再听／文字／更多”。同一步滚动时复用窗口，同时避开操作控件与字体预览；滑动方向有箭头。“更多”提供暂停、换位置、静音、语言和结束，结束前可以取消。必要的安全提示与结果确认不能隐藏。
-- **首次引导**：依次选择简体／繁体／英语、应用内字号、输入与播报语言，再解释权限及练习圈画；可稍后设置权限。简繁字形不改变所选语言。
-- **首次设置与中断恢复**：保留任务和帮助选择，暂停／继续沿用同一次尝试，恢复时重新识别页面。增加受限制设置的人工帮助及应用信息入口；设置中分别展示权限、连接与任务状态，并可主动复制本机诊断。
-- **结果确认与记录**：字体和手动亮度可直接选择继续调整；确认或退出后显示明确回执，可返回应用或留在当前页面。本机最多保留 20 次可删除记录，区分确认与未确认结束。
-- **目标匹配与语音**：固定模式的模型只选择四项已审核任务、澄清或拒绝；新屏幕模式另行分析当前页面。Debug 模拟器经本机代理使用方舟模型、火山 ASR 与 TTS，密钥留在宿主机。代理不可用时，固定模式保留本地匹配，新模式明确停止圈画；播报保留设备或文字退路。
-- **当前页面的 AI 判断**：独立屏幕模式把所选 App 的可见控件交给模型，截图为另选项；模型不能编造控件或坐标。离开所选 App 会暂停，响应过期、目标无法定位或云端失败时撤圈并提供重试。
+- **Three independent language settings:** input, interface/AI text, and speech each support Mandarin, Cantonese, and English.
+- **Three help levels:** full guidance, light hints, and trying independently with help on demand.
+- **Goal-first home screen:** speak or type a need, then confirm the matched task. Four tasks remain as shortcuts; unsupported requests are explained.
+- **Floating guidance:** a current instruction with replay and more options; collapsed controls keep replay and text easy to find. The same window is reused while scrolling within a step. Placement avoids controls and font previews; arrows explain swipe direction. More options include pause, move, mute, languages, and ending with a cancel path. Required safety and result-confirmation content cannot be hidden.
+- **Onboarding:** choose Simplified Chinese, Traditional Chinese, or English, app text size, input language, and voice language; then review permissions and a highlight practice. Permissions can be deferred. Script choice does not change the selected language.
+- **Setup and recovery:** keep the chosen task and help level, preserve one attempt across pause/resume, and recheck the screen before continuing. Restricted-settings help and app-information access are available. Diagnostics distinguish permission, connection, and task state and can be copied explicitly.
+- **Confirmation and history:** font and manual-brightness results allow further adjustment. Confirmation or exit produces a receipt with return/stay choices. Up to 20 deletable local attempts distinguish confirmed completion from an unconfirmed end.
+- **Intent matching and speech:** fixed-mode AI chooses only a reviewed task, clarification, or rejection. Screen mode separately analyzes the current page. The Debug emulator uses Ark models and Volcano ASR/TTS through a local proxy; keys stay on the host. Without the proxy, fixed mode retains local matching, screen mode stops highlighting, and speech retains device/text fallback.
+- **Current-screen AI:** visible controls from the selected app go to the model; screenshots are optional. Targets must exist in the current snapshot. Leaving the app pauses guidance; stale replies, unverified targets, and cloud failures remove highlights and offer retry.
 
-## 实际界面
+## Actual screens
 
-以下为 0.2.0 在真实 F-Droid、时钟页面上的模型引导，分别展示设置入口、输入框与键盘避让、计时器入口。流程与日志见[本轮验收](docs/validation/screen-guidance-2026-10-18.md)。
+These 0.2.0 screenshots show real F-Droid and Clock screens: finding Settings, keeping a search field and keyboard accessible, and finding Timer. See the [validation record](docs/validation/screen-guidance-2026-10-18.md).
 
 <p>
-  <img src="docs/screenshots/android15-oct18-screen-fdroid-settings.png" width="240" alt="真实模型圈出 F-Droid 设置按钮，提示卡避开目标" />
-  <img src="docs/screenshots/android15-oct18-screen-search-input.png" width="240" alt="AI 提示输入 Wikipedia，输入框和键盘均未被遮挡" />
-  <img src="docs/screenshots/android15-oct18-screen-clock-timer.png" width="240" alt="结合窗口截图与控件后，模型圈出时钟计时器入口" />
+  <img src="docs/screenshots/android15-oct18-screen-fdroid-settings.png" width="240" alt="A real model highlights F-Droid Settings while the card avoids the target" />
+  <img src="docs/screenshots/android15-oct18-screen-search-input.png" width="240" alt="Wikipedia input guidance leaves the field and keyboard accessible" />
+  <img src="docs/screenshots/android15-oct18-screen-clock-timer.png" width="240" alt="Window image and controls ground a highlight on Clock's Timer tab" />
 </p>
 
 <details>
-<summary>此前首页与固定引导截图（0.1.2）</summary>
+<summary>Earlier home screen and reviewed-flow screenshots (0.1.2)</summary>
 
-以下为 2026-10-09 模拟器实际运行的中文首页、0.1.2 字体预览避让与结束回执。
+Actual emulator captures from October 9, 2026: Chinese home screen, font-preview avoidance, and an end receipt.
 
 <p>
-  <img src="docs/screenshots/android15-oct9-home-zh.png" width="240" alt="中文首页：需求输入在任务快捷入口前面" />
-  <img src="docs/screenshots/android15-oct9-v012-font-preview.png" width="240" alt="0.1.2 字体页：提示卡同时避开预览与滑块" />
-  <img src="docs/screenshots/android15-oct9-v012-ended-receipt.png" width="240" alt="0.1.2 未确认结束回执：返回数字扶手或留在这里" />
+  <img src="docs/screenshots/android15-oct9-home-zh.png" width="240" alt="Chinese home screen puts the goal composer before task shortcuts" />
+  <img src="docs/screenshots/android15-oct9-v012-font-preview.png" width="240" alt="The 0.1.2 card avoids both the font preview and slider" />
+  <img src="docs/screenshots/android15-oct9-v012-ended-receipt.png" width="240" alt="An unconfirmed end offers return to Digital Handrail or stay here" />
 </p>
-
 </details>
 
-本次首页、首次设置、浮窗与完成判断的验证见[PR #11 整合记录](docs/ui-integration-2026-10-09.md)。先前 Chrome／Maps 的证据见[浮窗走查](docs/overlay-usability.md)和[界面与端到端验收](docs/uiux-validation.md)。
+Home, onboarding, overlays, and completion checks are documented in the [PR #11 integration record](docs/ui-integration-2026-10-09.md). Earlier Chrome/Maps evidence is in the [overlay review](docs/overlay-usability.md) and [UI/end-to-end validation](docs/uiux-validation.md).
 
-## 快速运行
+## Quick start
 
-需要 JDK 17、Android SDK Platform 35、Build Tools 35、Platform Tools，以及上述演示模拟器。`scripts/dev-env.sh` 默认使用 macOS SDK 路径；其他环境须先设置自己的 `ANDROID_HOME` 与 `JAVA_HOME`。
+Use JDK 17, Android SDK Platform 35, Build Tools 35, Platform Tools, and the demo emulator described above. The environment helper defaults to macOS paths; on other systems, set ANDROID_HOME and JAVA_HOME first.
 
-在仓库根目录执行：
+Run from the repository root:
 
-```bash
+~~~bash
 git switch main
 git pull --ff-only origin main
 source scripts/dev-env.sh
@@ -88,45 +87,42 @@ adb devices
 ./gradlew :guide:assembleDebug :guide:testDebugUnitTest :guide:lintDebug
 ./scripts/install-app.sh
 adb shell am start -n org.hku4sdg.handrail/.MainActivity
-```
+~~~
 
-先完成首次语言与字号设置，再输入需求或选择任务和帮助方式。跨应用引导首次使用须在系统无障碍设置中亲手开启“数字扶手 · 手机引导”，返回应用后再确认开始。字体任务起始字号须未达到上限；手动调亮须留出调高空间。若自动亮度已开启，应用先引导用户关闭，再调滑块；无法识别则撤圈并允许返回。自动调节只在设备具备该功能且开关唯一可识别时引导。语音拒绝或不可用时，仍可使用文字与任务卡。
+Complete onboarding, enter a goal or select a task, and choose a help level. For cross-app guidance, manually enable Digital Handrail's accessibility service in system Settings, return, and confirm starting. Font size must have room to increase; manual brightness must start below its maximum. If adaptive brightness is on, the manual flow first guides users to turn it off. Adaptive guidance requires a unique, verifiable switch on a device that has the feature. Unavailable speech does not prevent text or task-card use.
 
-不配置云端密钥也可演示任务卡与跨应用引导。云端语音／AI 的本机设置、构建产物、回归命令及排查方式见[开发接手指南](docs/development.md)。
+Task cards and local guidance do not require cloud keys. See the [developer handoff](docs/development.md) for proxy setup, artifacts, regression commands, and troubleshooting.
 
-## 验证状态与适用边界
+## Validation and limits
 
-0.2.0 的真实跨 App 模型引导、独立文字与播报、键盘避让、结果确认、私人页阻断，以及构建和回归证据见[屏幕引导验收](docs/validation/screen-guidance-2026-10-18.md)。本轮没有为 F-Droid 或时钟编写产品固定步骤，也没有把截图辅助理解说成任意 App 都可用。
+- **0.2.0:** [screen-guidance validation](docs/validation/screen-guidance-2026-10-18.md) covers real cross-app model calls, independent text/speech, keyboard avoidance, confirmation, private-page blocking, builds, and regressions. There are no product-specific F-Droid/Clock flows and no claim of universal app support.
+- **0.1.3:** [AI/speech validation](docs/validation/ai-voice-2026-10-17.md) covers live providers, Android model/playback checks, and stopped-proxy fallback. Synthetic speech regression is not real-user speech acceptance.
+- **0.1.2:** [validation summary](docs/validation/reliability-2026-10-09.md) records build IDs and limits. The emulator lacks adaptive brightness; its switch has not passed device acceptance. The cause of the reported phone service shutdown remains unresolved.
+- **October 9 integration:** Debug, unsigned Release, test APK, fixture, 28 Kotlin tests, 9 proxy tests, and lint passed locally (0 errors; 6 guide and 3 fixture warnings). Runtime checks covered typed goals, English onboarding, independent languages, help levels, overlays, 1.0/2.0 font-scale focus, and Chinese font/brightness Settings. Waiting 13 seconds did not complete a task; a real increase plus user confirmation did. GitHub Actions did not start because of account billing/quota restrictions at that time. See the [dated record](docs/ui-integration-2026-10-09.md).
+- **0.1.1 phone trial:** 28 Kotlin tests, Debug/test builds, lint, and real Chinese Settings checks on API 35 passed, including collapse/move/pause/resume and filtered diagnostics. vivo X300s was not tested; API 36 admission used synthetic device parameters. See [phone testing](docs/phone-testing.md).
+- **October 2, b187343:** Debug, unsigned Release, test APK, 18 Kotlin tests, lint, and [GitHub CI](https://github.com/randyxian08/HKU4SDG/actions/runs/36987251577) passed. Native overlay checks exercised 20 actions for 1.0-scale font guidance and 20 for 2.0-scale brightness. CI did not include emulator checks.
 
-0.1.3 的真实云端调用、Android 模型／播放检查及代理停止退路见[AI／语音验收](docs/validation/ai-voice-2026-10-17.md)。云端能力仍仅连接 Debug 模拟器的本机代理；合成音频回归不代表真人语音验收。
+On the [51 synthetic trilingual development examples](docs/intent-evaluation.md), Ark scored 51/51 and local rules 37/51; both had zero out-of-scope false matches. Synthetic trilingual audio passed TTS-to-ASR regression. These results do not establish human accuracy, Cantonese quality, or learning outcomes.
 
-0.1.2 的最新构建、运行检查、版本标识及限制见[验证摘要](docs/validation/reliability-2026-10-09.md)。自动亮度在本次模拟器不具备，自动开关分支不能算设备验收；手机服务自行关闭的根因仍待诊断，不能宣称已经彻底修复。
+Full TalkBack gestures/reading order, native-speaker listening, non-team trials, delayed independent repetition, arbitrary apps, and other devices remain unaccepted. Third-party loading feedback still needs improvement. Planned features must not be presented as delivered.
 
-此前 2026-10-09 整合版通过 Debug、未签名 Release、开发检查 APK、内部夹具构建、28 项 Kotlin 单元测试、9 项代理测试及 Android lint（无错误，guide 有 6 条警告、内部夹具有 3 条警告）。在 API 35 模拟器检查需求输入、英文首次设置、独立语言、三档提示、浮窗控制、1.0／2.0 字号平台焦点及中文字体／亮度设置。滑块不动等待 13 秒不能确认完成；实际数值增加后再由用户确认。GitHub Actions 因账号账单／额度限制未启动，不能算 CI 通过。证据与条件见[整合记录](docs/ui-integration-2026-10-09.md)。
+## Documentation and collaboration
 
-0.1.1 手机实验版通过 28 项 Kotlin 单元测试、Debug／开发检查 APK 构建和 lint，并在 **API 35 模拟器的真实中文设置页面**完成字体、亮度、浮窗收起／换位／暂停恢复和脱敏适配信息检查。vivo X300s 尚未实测；API 36 准入使用合成设备参数验证。详见[手机测试记录](docs/phone-testing.md)。
+Start at the [documentation index](docs/README.md):
 
-2026-10-02 功能提交 `b187343` 已通过 Debug、未签名 Release、开发检查 APK、18 项 Kotlin 单元测试、Android lint 及 [GitHub CI](https://github.com/randyxian08/HKU4SDG/actions/runs/36987251577)。1.0 字号字体任务与 2.0 字号亮度任务各完成 20 次原生浮窗操作检查；CI 不包含模拟器检查。
+- [Product experience](docs/product-experience.md): single-app journey and priorities.
+- [Developer handoff](docs/development.md): environment, modules, proxy, checks, and troubleshooting.
+- [AI screen guidance](docs/screen-guidance.md): current-screen analysis, consent, grounding, and limits.
+- [Phone testing](docs/phone-testing.md): current download and historical phone trials.
+- [Demo cases](docs/demo-cases.md): reviewed flows, current-screen cases, and failure paths.
+- [GenAI pitch brief](docs/pitch-genai.md): model use, evidence, limitations, cost, and demo order.
+- [0.1.2 reliability](docs/guide-reliability-2026-10-09.md): preview avoidance, stable windows, brightness branches, and diagnostics.
+- [UI integration](docs/ui-integration-2026-10-09.md): home, onboarding, completion, and actual captures.
+- [Earlier overlay and third-party cases](docs/overlay-usability.md).
+- [MVP plan](docs/mvp-plan.md): dated scope and observable acceptance.
 
-[51 条合成三语开发样本](docs/intent-evaluation.md)中，方舟模型为 51/51，本地规则为 37/51，范围外误匹配均为 0；三语合成音频已通过 TTS→ASR 接口回归。这些不代表真人准确率、粤语音质或学习效果。
+See [CONTRIBUTING.md](CONTRIBUTING.md) for ownership, validation, and review. At least one peer should review before merging. Never commit keys, .env files, real-user recordings, identity data, or sensitive screenshots.
 
-尚未验收完整 TalkBack 手势／朗读顺序、真人三语审听、非团队成员试用、稍后独立重做、任意 App 或其他设备。第三方页面加载初期的未识别反馈仍需优化。仓库里标作规划的功能不应当作已交付能力。
+The README and public release information are in English. Historical documentation remains in its original language. The app's multilingual UI and original screenshots, logs, fixtures, and evaluation data retain their recorded languages.
 
-## 文档与协作
-
-从[文档导航](docs/README.md)选择产品、开发、演示或验证入口：
-
-- [产品体验方案](docs/product-experience.md)：单 App 的用户路径和功能优先级。
-- [开发接手指南](docs/development.md)：环境、模块、云端代理、测试和故障排查。
-- [AI 屏幕引导](docs/screen-guidance.md)：当前页面分析、跨 App 的新入口、授权、目标核对与限制。
-- [手机测试指南](docs/phone-testing.md)：0.1.1 安装、字体／亮度实验引导及 vivo 测试注意点。
-- [可演示案例](docs/demo-cases.md)：四项场景、失败退路和演示口径。
-- [GenAI 路演说明](docs/pitch-genai.md)：模型的用途、选择依据、对照、限制、成本和演示顺序。
-- [0.1.2 浮窗与引导优化](docs/guide-reliability-2026-10-09.md)：预览避让、稳定窗口、亮度分支、权限帮助与诊断。
-- [首页与浮窗整合记录](docs/ui-integration-2026-10-09.md)：当前 UI、首次设置、完成条件及真实截图。
-- [先前浮窗与第三方案例](docs/overlay-usability.md)：Chrome／Maps 操作和历史验证。
-- [MVP 开发计划](docs/mvp-plan.md)：当前交付范围与可观察验收。
-
-认领工作、提交 PR 和合并要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。PR 需说明实际验证和未验证部分；合并前由至少一位同伴审阅。不要提交密钥、`.env`、真实用户录音、身份资料或敏感截图。
-
-[飞书产品定义](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg) · [飞书进度与案例](https://my.feishu.cn/wiki/NIqHwHf98iIjqektf8KcHtdanZg)
+[Feishu product definition](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg) · [Feishu progress and cases](https://my.feishu.cn/wiki/NIqHwHf98iIjqektf8KcHtdanZg)
