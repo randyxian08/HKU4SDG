@@ -11,3 +11,5 @@
 涉及代码的本地提交前运行 `source scripts/dev-env.sh` 和 `./gradlew :guide:assembleDebug :demo-target:assembleDebug :guide:testDebugUnitTest`。跨应用圈画、触控穿透、权限、TTS 和 ASR 需在本次目标演示设备 Android 15 / Pixel 7 模拟器上逐项检查，CI 编译通过不能代替运行验收。纯文档修改核对事实、链接与 `git diff --check`。每个 PR 附上检查设备、Android 版本和相关语言。
 
 产品需求以仓库中的明确任务和[飞书产品文档](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)为起点。有冲突时先在 Issue 或 Pull Request 中确认，再修改实现。
+
+0.2.0 的 AI 屏幕模式与固定流程分开验收。涉及该模式的 PR 要说明页面文字／截图的同意范围、响应过期后的撤圈、私人内容阻断、目标控件核对、用户确认，以及四项固定流程之外的真实 App 结果；内部夹具不能替代第三方 App 证据。

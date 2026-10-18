@@ -1,0 +1,8 @@
+
+Waiting for service rebind
+
+PASS
+Stopped proxy: explicit failure and no target, no invented fallback step
+LIMIT: emulator test gestures, no real-user study; screenshot does not enable invented coordinate targets
+
+Test cleanup: guide rebound

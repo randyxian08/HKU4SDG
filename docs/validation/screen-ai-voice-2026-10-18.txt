@@ -1,0 +1,14 @@
+
+Waiting for service rebind
+
+PASS
+MANDARIN: non-keyword goal reached model-labelled font confirmation, no automatic start
+MANDARIN: real cloud audio reached Android MediaPlayer.start; temporary audio removed
+CANTONESE: non-keyword goal reached model-labelled font confirmation, no automatic start
+CANTONESE: real cloud audio reached Android MediaPlayer.start; temporary audio removed
+ENGLISH: non-keyword goal reached model-labelled font confirmation, no automatic start
+ENGLISH: real cloud audio reached Android MediaPlayer.start; temporary audio removed
+Clarification stays on home; unsupported task offers screen-guide setup without starting; private goal blocked locally
+LIMIT: no microphone-input, native-speaker listening or phone/cloud-deployment acceptance
+
+Test cleanup: guide rebound

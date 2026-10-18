@@ -1,5 +1,7 @@
 # 数字扶手｜受约束 GenAI 意图识别验收
 
+本文记录四项固定任务的意图分类。0.2.0 新增[当前页面 AI 引导](screen-guidance.md)，属于独立链路；下方 51 条开发集结果不能用于描述新屏幕模式的准确率。
+
 飞书[产品定义](https://my.feishu.cn/wiki/FTF5wKcn0iNra6kG2WpcfiZ2nCg)提出：AI 理解不同的任务表述，但流程审核、页面准入、圈画目标和完成条件由确定性逻辑控制。目前 Android 15 / Pixel 7 模拟器中有 `font_size`（系统字体）、`screen_brightness`（系统亮度）、`chrome_bookmark`（Chrome 收藏指定 GovHK 长者服务网页）、`maps_library_address`（Google Maps 查看香港中央图书馆地址）四条已测路径；模型只能从这四项中选择、请求澄清或拒绝。
 
 ## 目前实现

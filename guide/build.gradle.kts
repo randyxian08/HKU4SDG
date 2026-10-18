@@ -13,8 +13,8 @@ android {
         applicationId = "org.hku4sdg.handrail"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.2.0"
         val revision = providers.exec { commandLine("git", "describe", "--always", "--dirty") }.standardOutput.asText.get().trim()
         val stamp = Instant.now().toString()
         buildConfigField("String", "BUILD_ID", "\"$revision/$stamp\"")

@@ -1,0 +1,18 @@
+
+Waiting for service rebind
+
+PASS
+Real model, Mandarin text + Cantonese speech text: 点击页面上方导航栏里的「Settings」选项，打开F-Droid应用的设置页面 / 㩒喺页面上方导航栏嘅「Settings」选项，打开呢个应用嘅设置页面
+Replay of model-generated Cantonese instruction reached Android MediaPlayer.start
+User test gesture on actual node n55, Settings, Rect(818, 158 - 944, 284)
+F-Droid: unregistered app, real controls -> Settings -> model result -> explicit user confirmation
+User test gesture on actual node n60, Search, Rect(367, 2127 - 713, 2337)
+User test gesture on actual node n74, , Rect(148, 146 - 932, 293)
+F-Droid multi-step search: Search -> editable field -> synthetic Wikipedia input -> visible results; English text + Mandarin voice text; AI controls avoid keyboard
+User test gesture on actual node n13, Timer, Rect(432, 2127 - 648, 2337)
+Clock: separate unregistered app, real window screenshot + controls, Timer reached without starting a timer
+Leaving selected app pauses: other-app page was not sent
+Synthetic password page blocked locally, zero model requests and no circle
+LIMIT: emulator test gestures, no real-user study; screenshot does not enable invented coordinate targets
+
+Test cleanup: guide rebound

@@ -1,6 +1,6 @@
 # 数字扶手｜开发接手指南
 
-更新于 2026-10-17。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。当前 0.1.3 的 AI／语音接入与验收见[演示指南](ai-voice-demo-2026-10-17.md)；0.1.2 的引导改进见[优化记录](guide-reliability-2026-10-09.md)，手机实验路径见[手机测试指南](phone-testing.md)。
+更新于 2026-10-18。本文帮助协作者构建、运行和检查原生 Android MVP。用户只安装 `guide`；`demo-target` 和 `androidTest` APK 都是开发工具。0.2.0 的当前页面分析见 [AI 屏幕引导](screen-guidance.md)；此前 0.1.3 的 AI／语音验收见[演示指南](ai-voice-demo-2026-10-17.md)，手机实验路径见[手机测试指南](phone-testing.md)。
 
 ## 1. 获取当前实现
 
@@ -75,11 +75,13 @@ adb shell am start -n org.hku4sdg.handrail/.MainActivity
 | [ServiceDiagnostics.kt](../guide/src/main/java/org/hku4sdg/handrail/ServiceDiagnostics.kt)、[BrightnessFlow.kt](../guide/src/main/java/org/hku4sdg/handrail/BrightnessFlow.kt) | 有界本机生命周期诊断、权限状态、构建标识；亮度目标分支 |
 | [Design.kt](../guide/src/main/java/org/hku4sdg/handrail/Design.kt)、`*Copy.kt` | 视觉样式及页面／恢复／帮助文案 |
 | [IntentClient.kt](../guide/src/main/java/org/hku4sdg/handrail/IntentClient.kt)、[CloudAsr.kt](../guide/src/main/java/org/hku4sdg/handrail/CloudAsr.kt)、[CloudTts.kt](../guide/src/main/java/org/hku4sdg/handrail/CloudTts.kt) | Debug 模拟器到宿主机的意图、识别和合成请求 |
+| [ScreenGuideController.kt](../guide/src/main/java/org/hku4sdg/handrail/ScreenGuideController.kt)、[ScreenGuideClient.kt](../guide/src/main/java/org/hku4sdg/handrail/ScreenGuideClient.kt)、[ScreenGuide.kt](../guide/src/main/java/org/hku4sdg/handrail/ScreenGuide.kt) | 用户选定 App 的页面快照、可选截图、模型下一步、过期响应处理和本机目标校验 |
+| [screen_planner.py](../scripts/screen_planner.py) | `/screen-step` 请求校验、当前页面模型提示词、语言约束与控件 ID 核对 |
 | [voice_proxy.py](../scripts/voice_proxy.py)、[asr_client.py](../scripts/asr_client.py) | 宿主机调用方舟／火山接口、返回校验及演示请求上限 |
 | `guide/src/test/`、`guide/src/androidTest/` | 纯逻辑测试与模拟器平台操作检查 |
 | `demo-target/` | 内部受控跨应用／安全测试夹具 |
 
-意图模型只选择任务、澄清或拒绝；Android 端再校验允许列表。已审核页面、圈画位置和结果条件由本地逻辑决定。变化后的坐标不可复用，未知页面不能由模型补造步骤。
+固定意图模型只选择四项任务、澄清或拒绝，固定流程由本地逻辑决定。新增屏幕模式通过独立的同意入口，把当前页面交给模型选择一步；它不沿用四项任务的包名白名单，但只处理本次用户选定的 App。两端均校验返回控件，变化后的页面不能复用旧建议。详见[屏幕引导的数据边界](screen-guidance.md)。
 
 ## 5. 可选：云端 AI 与三语语音
 
@@ -118,6 +120,7 @@ curl http://127.0.0.1:8765/health
 | TTS | 当前固定引导文字与播报语言 | 最多 100 次、合计 5,000 字符 |
 | 意图 | 用户主动提交的目标文字与输入语言 | 最多 60 次，每条最多 160 字 |
 | ASR | 用户主动录制的 PCM 与输入语言 | 最多 30 次，每段最多 8 秒 |
+| 屏幕下一步 | 用户目标、所选 App 的可见控件和状态；窗口截图另选 | 最多 60 次；App 每次会话最多 24 次分析 |
 
 识别结果先放入可编辑输入框，用户再主动提交目标。意图接口不接收截图、页面文字或无障碍树；这些配置不是正式云端部署，也不替代控制台账单和服务额度。真实语音音质与识别效果仍需另行验收。
 
@@ -136,7 +139,7 @@ source scripts/dev-env.sh
 
 ```bash
 ./gradlew :guide:assembleDebug :guide:assembleRelease :guide:assembleDebugAndroidTest :demo-target:assembleDebug :guide:testDebugUnitTest :guide:lintDebug :demo-target:lintDebug
-python3 -m unittest discover -s scripts -p 'test_voice_proxy.py'
+python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
 CI 配置见 [android.yml](../.github/workflows/android.yml)。代理单元测试使用模拟接口响应，不代表真实语音服务通过。Kotlin 报告位于 `guide/build/reports/tests/testDebugUnitTest/`，lint 报告位于 `guide/build/reports/lint-results-debug.html`。
@@ -147,7 +150,7 @@ CI 配置见 [android.yml](../.github/workflows/android.yml)。代理单元测�
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
-当前共 13 项；上方 CI 命令只运行 `test_voice_proxy.py`，不包含启动配置的两项检查。
+当前包含代理、启动配置和屏幕模型校验；CI 与本地均运行 `test_*.py`。运行数量以当前测试输出为准。
 
 仅改动 Markdown 文件或 `docs/` 下的文档、截图和验证记录时，push 与 pull request 不触发 Android 构建。源码、Gradle、代理脚本及工作流改动仍触发构建；同一工作流和引用上的新运行会取消旧运行。需要检查纯文档修订时，可在 GitHub Actions 中手动运行 `Android build`。
 
@@ -165,6 +168,10 @@ python3 scripts/run-device-check.py overlay --task brightness
 python3 scripts/run-device-check.py phone
 # 先在系统设置启用 TalkBack，再检查平台角色与焦点：
 python3 scripts/run-device-check.py a11y
+# 真实模型、F-Droid／Clock 与内部私人页夹具，可能产生云端用量：
+python3 scripts/run-device-check.py screen
+# 停止代理后验证失败退路：
+python3 scripts/run-device-check.py screen-offline
 ```
 
 脚本仅允许模拟器，要求数字扶手原本已启用。Instrumentation 启动会结束旧目标进程；收到等待状态及正常结束后，脚本只重绑数字扶手，保留其他已启用服务。用户中途关闭权限时不重新开启；检查被打断时须先核对设备上的运行状态，再清理或重试。它核对结果正文 `PASS`、无 `FAIL` 及进程退出状态，不能只以 `adb` 退出码判断通过。应用本身不使用此操作恢复权限。`integration`、`overlay`、`reliability` 使用英文系统；`phone` 使用真实中文系统页面。多个目标用 `--serial` 指定。

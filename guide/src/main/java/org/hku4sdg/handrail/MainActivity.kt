@@ -20,6 +20,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ScrollView
@@ -27,7 +28,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 class MainActivity : Activity() {
-    private enum class Screen { HOME, TASK, LANGUAGES, PRACTICE, SETUP, RECOVERY, FIRST, CONFIRM, ADJUST, SETUP_HELP, DIAGNOSTICS, RECEIPT }
+    private enum class Screen { HOME, TASK, LANGUAGES, PRACTICE, SETUP, RECOVERY, FIRST, CONFIRM, ADJUST, SETUP_HELP, DIAGNOSTICS, RECEIPT, SCREEN_GUIDE }
     private var screen = Screen.HOME
     private lateinit var preferences: GuidePreferences
     private lateinit var input: EditText
@@ -45,6 +46,10 @@ class MainActivity : Activity() {
     private var recognizer: SpeechRecognizer? = null
     private var inputGeneration = 0
     private var speechBusy = false
+    private var screenGoal = ""
+    private var screenPackage: String? = null
+    private var screenAppName = ""
+    private var screenImages = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +68,11 @@ class MainActivity : Activity() {
         Design.displayScript = preferences.displayScript ?: DisplayScript.HANS
         if (!preferences.initDone) {
             showFirstRun()
+            return
+        }
+        if (intent.getBooleanExtra("screen_guide_setup", false)) {
+            intent.removeExtra("screen_guide_setup")
+            if (intent.getBooleanExtra("screen_guide_languages", false)) showLanguages() else showScreenGuideSetup()
             return
         }
         if (intent.getBooleanExtra("return_to_task", false)) {
@@ -90,6 +100,7 @@ class MainActivity : Activity() {
             Screen.SETUP_HELP -> showSetupHelp()
             Screen.DIAGNOSTICS -> showDiagnostics()
             Screen.RECEIPT -> showReceipt()
+            Screen.SCREEN_GUIDE -> showScreenGuideSetup()
             else -> {
                 showHome()
                 savedInstanceState?.getString("goal")?.let(input::setText)
@@ -102,7 +113,7 @@ class MainActivity : Activity() {
         outState.putString("goalSource", goalSource.name)
         outState.putString("selectedTask", selectedTask.id)
         outState.putString("help", selectedHelp.name)
-        if (::input.isInitialized) outState.putString("goal", input.text.toString())
+        if (screen == Screen.HOME && ::input.isInitialized) outState.putString("goal", input.text.toString())
         super.onSaveInstanceState(outState)
     }
 
@@ -115,6 +126,10 @@ class MainActivity : Activity() {
         if (::preferences.isInitialized && !preferences.initDone && screen == Screen.FIRST) {
             showFirstRun()
             return
+        }
+        if (ScreenGuideSession.current != null) {
+            ScreenGuideSession.current?.paused = true
+            GuideAccessibilityService.refreshScreenGuide()
         }
         if (::preferences.isInitialized && preferences.receiptPending) {
             preferences.receiptPending = false
@@ -139,6 +154,11 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra("screen_guide_setup", false)) {
+            intent.removeExtra("screen_guide_setup")
+            if (intent.getBooleanExtra("screen_guide_languages", false)) showLanguages() else showScreenGuideSetup()
+            return
+        }
         if (intent.getBooleanExtra("return_to_task", false)) {
             intent.removeExtra("return_to_task")
             selectedTask = preferences.activeTask
@@ -272,7 +292,7 @@ class MainActivity : Activity() {
             LinearLayout.LayoutParams(0, -2, 1f))
         composer.addView(actions)
         space(composer, 8)
-        composer.addView(text(c("只发送你提交的目标，不发送屏幕。", "只发送你提交嘅目标，唔发送屏幕。", "Only your submitted goal is sent. Your screen stays private."), 13f, Design.secondary))
+        composer.addView(text(c("查找任务只发送目标；屏幕引导会先另行说明。", "搵任务只发送目标；屏幕指引会先另外说明。", "Finding a task sends only your goal. Screen guidance asks separately."), 13f, Design.secondary))
         speechStatus = text("", 16f, Design.ink, true).apply {
             visibility = View.GONE
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -280,6 +300,11 @@ class MainActivity : Activity() {
             background = Design.shape(Design.paleGreen, dp(14).toFloat())
         }
         composer.addView(speechStatus)
+        space(composer, 12)
+        composer.addView(action(c("看屏幕，帮我下一步", "睇屏幕，帮我下一步", "Help with this app's screen"), Design.paleGreen, Design.forest, 54) {
+            screenGoal = input.text.toString().trim()
+            showScreenGuideSetup()
+        })
         body.addView(composer, composerIndex)
         root.addView(ScrollView(this).apply { isFillViewport = true; addView(body) }, LinearLayout.LayoutParams(-1, -1))
         applyInsets(root, includeKeyboard = true)
@@ -355,7 +380,7 @@ class MainActivity : Activity() {
                     showConfirm()
                 }
                 IntentClient.Decision.CLARIFY -> setInputStatus(GuideContent.intentClarify(preferences.textLanguage))
-                IntentClient.Decision.UNSUPPORTED -> setInputStatus(GuideContent.intentUnsupported(preferences.textLanguage))
+                IntentClient.Decision.UNSUPPORTED -> { screenGoal = goal; showScreenGuideSetup() }
                 null -> {
                     val fallback = TaskMatcher.match(goal)
                     if (fallback != null) {
@@ -365,6 +390,94 @@ class MainActivity : Activity() {
                     } else setInputStatus(GuideContent.intentUnavailable(preferences.textLanguage))
                 }
             }
+        }
+    }
+
+    private fun showScreenGuideSetup() {
+        val restore = screen != Screen.SCREEN_GUIDE
+        stopInput()
+        screen = Screen.SCREEN_GUIDE
+        ScreenGuideSession.current?.takeIf { restore }?.let { current ->
+            current.paused = true
+            screenGoal = current.goal; screenPackage = current.packageName
+            screenAppName = current.appName; screenImages = current.includeImage
+        }
+        val l = preferences.textLanguage
+        val body = page(ScreenGuideCopy.title(l), ::showHome)
+        body.addView(text(c("打开你要用的 App，一步一步来", "打开你要用嘅 App，一步一步嚟", "Open your app. Take one step at a time."), 26f, Design.ink, true).heading())
+        space(body, 14)
+        body.addView(text(c("AI 会根据当前可见的按钮和文字给出建议。你自己点击或滑动；看不清目标时会停止圈画。", "AI 会按而家睇到嘅按钮同文字提供建议。你自己㩒或者扫；认唔清目标就停止圈画。", "AI suggests a next step from visible controls and text. You tap or swipe. Uncertain targets are not highlighted."), 17f))
+        space(body, 20)
+        val goal = EditText(this).apply {
+            setText(screenGoal); hint = c("例如：找到这个 App 的主题设置", "例如：搵呢个 App 嘅主题设置", "For example: find this app's theme setting")
+            textSize = 18f * Design.appScale; minHeight = dp(56)
+            setTextColor(Design.ink); setHintTextColor(Design.secondary); setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = Design.shape(Design.surface, dp(16).toFloat(), Design.line, dp(1)); maxLines = 3
+            contentDescription = c("你希望在 App 里完成什么", "你想喺 App 入面做乜", "What do you want to do in the app?")
+        }
+        body.addView(goal)
+        space(body, 12)
+        val pick = action(if (screenPackage == null) c("选择一个 App", "拣一个 App", "Choose an app") else screenAppName,
+            Design.surface, Design.ink, 56) {
+            screenGoal = goal.text.toString().trim()
+            val apps = packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+                .filter { it.activityInfo.packageName != packageName }
+                .distinctBy { it.activityInfo.packageName }.sortedBy { it.loadLabel(packageManager).toString() }
+            AlertDialog.Builder(this).setTitle(c("你想使用哪个 App？", "你想用边个 App？", "Which app would you like to use?"))
+                .setItems(apps.map { it.loadLabel(packageManager).toString() }.toTypedArray()) { _, index ->
+                    screenPackage = apps[index].activityInfo.packageName
+                    screenAppName = apps[index].loadLabel(packageManager).toString(); showScreenGuideSetup()
+                }.setNegativeButton(c("取消", "取消", "Cancel"), null).show()
+        }
+        body.addView(pick)
+        space(body, 18)
+        val consent = CheckBox(this).apply {
+            text = c("本次引导期间，同意把所选 App 当前页面的可见控件文字交给云端 AI 分析。", "今次指引期间，同意将所拣 App 当前页面睇到嘅控件文字交俾云端 AI 分析。", "For this guide, allow visible control text from the selected app to be analyzed by cloud AI.")
+            textSize = 16f * Design.appScale; setTextColor(Design.ink); minHeight = dp(56)
+        }
+        body.addView(consent)
+        val images = CheckBox(this).apply {
+            text = c("同时提供当前页面截图（可选）", "同时提供当前页面截图（可选）", "Also include a screenshot of the current page (optional)")
+            textSize = 16f * Design.appScale; setTextColor(Design.ink); minHeight = dp(52)
+            isChecked = screenImages; isEnabled = Build.VERSION.SDK_INT >= 34
+            setOnCheckedChangeListener { _, checked -> screenImages = checked }
+        }
+        body.addView(images)
+        space(body, 12)
+        body.addView(text(c("请避开私信、账号和付款页面。检测到明显私人内容时会停止发送，但筛查不能保证识别所有资料。页面内容仅用于本次分析，不写入本机练习记录；云端处理遵循服务商政策。", "请避开私信、账号同付款页面。发现明显私人资料会停止发送，但筛查唔保证认到所有资料。页面内容只用于今次分析，唔写入本机练习记录；云端处理跟服务商政策。", "Avoid private messages, accounts and payment pages. Obvious sensitive content is blocked, but filtering is not comprehensive. Page content is not stored in local practice history. Provider policies apply to cloud processing."), 15f, Design.secondary))
+        space(body, 20)
+        val start = action(c("同意并打开 App", "同意并打开 App", "Agree and open app"), Design.forest, Design.surface, 58) {
+            val words = goal.text.toString().trim(); val pkg = screenPackage
+            if (!consent.isChecked || words.isBlank() || words.length > 160 || pkg == null) {
+                Toast.makeText(this, c("请写一句目标、选择 App，并确认本次分析。", "请写一句目标、拣 App，同确认今次分析。", "Enter a short goal, choose an app and allow this analysis."), Toast.LENGTH_LONG).show()
+            } else if (ScreenGuidePolicy.privateText(words) || ScreenGuidePolicy.risky(words)) {
+                Toast.makeText(this, ScreenGuideCopy.privatePage(l), Toast.LENGTH_LONG).show()
+            } else if (!ScreenGuideClient.available(this)) {
+                Toast.makeText(this, c("当前云端连接仅在开发模拟器提供。", "目前云端连接只喺开发模拟器提供。", "The cloud bridge currently runs on the development emulator."), Toast.LENGTH_LONG).show()
+            } else if (!serviceEnabled() || !GuideAccessibilityService.connected) {
+                screenGoal = words
+                AlertDialog.Builder(this).setMessage(c("请先开启数字扶手的无障碍引导服务，再返回这里开始。", "请先开启数字扶手嘅无障碍指引服务，再返嚟开始。", "Enable Digital Handrail's accessibility service, then return here to start."))
+                    .setPositiveButton(c("去设置", "去设置", "Open settings")) { _, _ -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+                    .setNegativeButton(c("取消", "取消", "Cancel"), null).show()
+            } else {
+                val launch = packageManager.getLaunchIntentForPackage(pkg)
+                if (launch == null) Toast.makeText(this, c("这个 App 暂时打不开，请重新选择。", "呢个 App 暂时打开唔到，请再拣。", "This app cannot be opened. Choose another."), Toast.LENGTH_LONG).show()
+                else {
+                    if (preferences.active) { preferences.finish(PracticeOutcome.ENDED); preferences.receiptPending = false }
+                    preferences.setupTask = null
+                    screenGoal = words; preferences.collapsed = false
+                    ScreenGuideSession.start(words, pkg, screenAppName, screenImages)
+                    try { startActivity(launch); GuideAccessibilityService.refreshScreenGuide() }
+                    catch (_: Exception) { ScreenGuideSession.stop(); Toast.makeText(this, c("打开失败，请重试。", "打开失败，请再试。", "Could not open the app. Try again."), Toast.LENGTH_LONG).show() }
+                }
+            }
+        }
+        body.addView(start)
+        ScreenGuideSession.current?.let {
+            space(body, 10)
+            body.addView(action(c("结束本次屏幕引导", "结束今次屏幕指引", "End this screen guide"), Design.surface, Design.ink, 52) {
+                ScreenGuideSession.stop(); GuideAccessibilityService.refreshScreenGuide(); showHome()
+            })
         }
     }
 

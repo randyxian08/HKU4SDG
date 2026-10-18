@@ -1,0 +1,12 @@
+
+Waiting for service rebind
+
+FAIL: Next page failed: UNAVAILABLE: HTTP 502: Target is not an allowed current control
+Real model, Mandarin text + Cantonese speech text: 点击页面右上角的Settings（设置）选项，打开应用的设置页面 / 㩒右上角嘅「Settings」，进入呢个应用嘅设置页面
+Replay of model-generated Cantonese instruction reached Android MediaPlayer.start
+User test gesture on actual node n55, Settings, Rect(818, 158 - 944, 284)
+F-Droid: unregistered app, real controls -> Settings -> model result -> explicit user confirmation
+User test gesture on actual node n60, Search, Rect(367, 2127 - 713, 2337)
+User test gesture on actual node n74, , Rect(148, 146 - 932, 293)
+
+Test cleanup: guide rebound

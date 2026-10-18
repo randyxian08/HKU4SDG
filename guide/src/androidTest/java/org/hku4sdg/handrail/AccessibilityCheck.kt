@@ -77,6 +77,9 @@ class AccessibilityCheck : Instrumentation() {
         }
     }
     override fun onStart() {
+        if (argumentsCheck == "screen" || argumentsCheck == "screen-offline") {
+            ScreenGuideCheck(this, argumentsCheck == "screen-offline").run(); return
+        }
         if (argumentsCheck == "ai" || argumentsCheck == "ai-offline") {
             AiVoiceCheck(this, argumentsCheck == "ai-offline").run(); return
         }
