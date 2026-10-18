@@ -6,7 +6,7 @@ Digital Handrail is a native Android app for people who need help using their ph
 
 Users install one **guide APK**. The **demo-target** module is an internal test fixture, not a second product or an installation requirement.
 
-**Download: [Android 0.2.0 test APK](https://github.com/randyxian08/HKU4SDG/releases/download/v0.2.0/digital-handrail-0.2.0-debug.apk) · [Release notes and checksums](https://github.com/randyxian08/HKU4SDG/releases/tag/v0.2.0).** Requires Android 8.0 or later. See the [phone testing guide](docs/phone-testing.md).
+**Download: [Android 0.2.0 test APK](https://github.com/randyxian08/hack4sdg/releases/download/v0.2.0/digital-handrail-0.2.0-debug.apk) · [Release notes and checksums](https://github.com/randyxian08/hack4sdg/releases/tag/v0.2.0).** Requires Android 8.0 or later. See the [phone testing guide](docs/phone-testing.md).
 
 This is a development-signed test build. Phones can try local font-size and brightness guidance. **Cloud AI screen guidance and cloud speech currently require the Debug emulator and a computer-hosted proxy; they do not run independently on ordinary phones.**
 
@@ -18,7 +18,7 @@ This is a development-signed test build. Phones can try local font-size and brig
 
 > **0.1.2:** Added preview avoidance, direct replay, explicit end receipts, brightness-goal choices, and local service diagnostics. See the [reliability changes](docs/guide-reliability-2026-10-09.md) for evidence and unresolved issues.
 
-> The original four-task baseline is [PR #6](https://github.com/randyxian08/HKU4SDG/pull/6). Version 0.1.1 introduced experimental phone guidance for font size and brightness; installation, Chinese-system screenshots, and limits are in the [phone guide](docs/phone-testing.md).
+> The original four-task baseline is [PR #6](https://github.com/randyxian08/hack4sdg/pull/6). Version 0.1.1 introduced experimental phone guidance for font size and brightness; installation, Chinese-system screenshots, and limits are in the [phone guide](docs/phone-testing.md).
 
 ## Current capabilities
 
@@ -100,7 +100,7 @@ Task cards and local guidance do not require cloud keys. See the [developer hand
 - **0.1.2:** [validation summary](docs/validation/reliability-2026-10-09.md) records build IDs and limits. The emulator lacks adaptive brightness; its switch has not passed device acceptance. The cause of the reported phone service shutdown remains unresolved.
 - **October 9 integration:** Debug, unsigned Release, test APK, fixture, 28 Kotlin tests, 9 proxy tests, and lint passed locally (0 errors; 6 guide and 3 fixture warnings). Runtime checks covered typed goals, English onboarding, independent languages, help levels, overlays, 1.0/2.0 font-scale focus, and Chinese font/brightness Settings. Waiting 13 seconds did not complete a task; a real increase plus user confirmation did. GitHub Actions did not start because of account billing/quota restrictions at that time. See the [dated record](docs/ui-integration-2026-10-09.md).
 - **0.1.1 phone trial:** 28 Kotlin tests, Debug/test builds, lint, and real Chinese Settings checks on API 35 passed, including collapse/move/pause/resume and filtered diagnostics. vivo X300s was not tested; API 36 admission used synthetic device parameters. See [phone testing](docs/phone-testing.md).
-- **October 2, b187343:** Debug, unsigned Release, test APK, 18 Kotlin tests, lint, and [GitHub CI](https://github.com/randyxian08/HKU4SDG/actions/runs/36987251577) passed. Native overlay checks exercised 20 actions for 1.0-scale font guidance and 20 for 2.0-scale brightness. CI did not include emulator checks.
+- **October 2, b187343:** Debug, unsigned Release, test APK, 18 Kotlin tests, lint, and [GitHub CI](https://github.com/randyxian08/hack4sdg/actions/runs/36987251577) passed. Native overlay checks exercised 20 actions for 1.0-scale font guidance and 20 for 2.0-scale brightness. CI did not include emulator checks.
 
 On the [51 synthetic trilingual development examples](docs/intent-evaluation.md), Ark scored 51/51 and local rules 37/51; both had zero out-of-scope false matches. Synthetic trilingual audio passed TTS-to-ASR regression. These results do not establish human accuracy, Cantonese quality, or learning outcomes.
 
