@@ -6,6 +6,10 @@
 
 用户只安装一个 `guide` APK。仓库中的 `demo-target` 是团队内部测试夹具，不是用户产品的安装前置条件。
 
+**下载安装：[Android 0.2.0 测试版 APK](https://github.com/randyxian08/HKU4SDG/releases/download/v0.2.0/digital-handrail-0.2.0-debug.apk) · [Release 说明与校验文件](https://github.com/randyxian08/HKU4SDG/releases/tag/v0.2.0)。** 最低 Android 8.0，安装步骤见[手机测试指南](docs/phone-testing.md)。
+
+这是开发签名的测试包。手机可尝试本机字体、亮度引导；云端 AI 屏幕引导和云端语音仍仅连接开发模拟器的电脑代理，尚不能在普通手机上独立使用云端功能。
+
 > 0.2.0 新增 [AI 屏幕引导](docs/screen-guidance.md)：用户选择 App 并同意后，模型分析当前可见控件，可另选提供窗口截图；每次只选一个真实控件，页面变化后撤圈并重新判断。无需给每个 App 预写一条固定任务，但仍依赖可读取的控件，不能宣称任意 App 已适配。云端连接当前仍限于 Debug 模拟器和电脑代理。
 
 > 0.1.3 修正当前火山 TTS 响应兼容问题，增加 AI／语音演示启动与真实调用检查，明确 AI 和本机匹配的来源。接入方式、比赛要求及验证边界见[AI 与三语语音](docs/ai-voice-demo-2026-10-17.md)。
